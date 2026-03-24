@@ -28,10 +28,8 @@ WORKDIR /app
 COPY --from=builder /app/.mastra/output ./
 
 # Exponer el puerto por defecto de Mastra
-EXPOSE 8080
+EXPOSE 4111
 
-ENV HOST=0.0.0.0
-ENV PORT=8080
 ENV NODE_ENV=production
 
 CMD ["node", "./index.mjs"]
