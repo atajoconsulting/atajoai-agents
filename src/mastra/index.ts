@@ -8,6 +8,7 @@ import { chatwootWebhookWorkflow } from './workflows/chatwoot-webhook';
 import { weatherAgent } from './agents/weather-agent';
 import { chatwootAgent } from './agents/chatwoot-agent';
 import { toolCallAppropriatenessScorer, completenessScorer, translationScorer } from './scorers/weather-scorer';
+import { apiRoutes } from './routes';
 
 export const mastra = new Mastra({
   workflows: { weatherWorkflow, chatwootWebhookWorkflow },
@@ -15,7 +16,6 @@ export const mastra = new Mastra({
   scorers: { toolCallAppropriatenessScorer, completenessScorer, translationScorer },
   storage: new LibSQLStore({
     id: "mastra-storage",
-    // stores observability, scores, ... into persistent file storage
     url: "file:./mastra.db",
   }),
   logger: new PinoLogger({
@@ -24,17 +24,18 @@ export const mastra = new Mastra({
   }),
   server: {
     host: "0.0.0.0",
-    port: 4111
+    port: 4111,
+    apiRoutes,
   },
   observability: new Observability({
     configs: {
       default: {
         serviceName: 'mastra',
         exporters: [
-          new DefaultExporter(), // Persists traces to storage for Mastra Studio
+          new DefaultExporter(),
         ],
         spanOutputProcessors: [
-          new SensitiveDataFilter(), // Redacts sensitive data like passwords, tokens, keys
+          new SensitiveDataFilter(),
         ],
       },
     },
