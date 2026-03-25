@@ -2,7 +2,7 @@
 import { Mastra } from '@mastra/core/mastra';
 import { PinoLogger } from '@mastra/loggers';
 import { LibSQLStore } from '@mastra/libsql';
-import { Observability, DefaultExporter, CloudExporter, SensitiveDataFilter } from '@mastra/observability';
+import { Observability, DefaultExporter, SensitiveDataFilter } from '@mastra/observability';
 import { weatherWorkflow } from './workflows/weather-workflow';
 import { chatwootWebhookWorkflow } from './workflows/chatwoot-webhook';
 import { weatherAgent } from './agents/weather-agent';
@@ -20,8 +20,12 @@ export const mastra = new Mastra({
   }),
   logger: new PinoLogger({
     name: 'Mastra',
-    level: 'info',
+    level: 'debug',
   }),
+  server: {
+    host: "0.0.0.0",
+    port: 4111
+  },
   observability: new Observability({
     configs: {
       default: {
