@@ -7,12 +7,13 @@ import {
 } from "@mastra/observability";
 import { PostgresStore } from "@mastra/pg";
 import { chatwootWebhookWorkflow } from "./workflows/chatwoot-webhook";
+import { webIndexerWorkflow } from "./workflows/web-indexer";
 import { chatwootAgent } from "./agents/chatwoot-agent";
 import { apiRoutes } from "./routes";
 import { env } from "./env";
 
 export const mastra = new Mastra({
-  workflows: { chatwootWebhookWorkflow },
+  workflows: { chatwootWebhookWorkflow, webIndexerWorkflow },
   agents: { chatwootAgent },
   storage: new PostgresStore({
     id: "pg-storage",
