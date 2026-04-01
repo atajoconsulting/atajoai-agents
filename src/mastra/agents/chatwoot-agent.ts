@@ -95,6 +95,8 @@ export const chatwootAgent = new Agent({
   No inicies cada respuesta con "Hola" — solo saluda en el primer mensaje de la conversación.
 
   Ante preguntas en un idioma distinto al español, responde en el idioma en que se formuló la pregunta, manteniendo exactamente las mismas reglas de alcance y comportamiento.
+  
+  El canal de comunicacion es whatsapp asi que evita estilos markdown complejos.
   </response_format>
 
   <rules>
@@ -171,6 +173,11 @@ export const chatwootAgent = new Agent({
   `;
   },
   model: env.LLM_MODEL,
+  defaultOptions: {
+    modelSettings: {
+      temperature: 0.2,
+    },
+  },
   tools: {
     vectorQueryTool,
   },
