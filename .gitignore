@@ -9,3 +9,4 @@ dist
 .netlify
 .vercel
 .idea
+/.pnpm-store/

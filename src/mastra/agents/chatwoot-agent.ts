@@ -1,6 +1,9 @@
 import { Agent } from "@mastra/core/agent";
+import { ModelRouterEmbeddingModel } from "@mastra/core/llm";
+import type { MastraMemory } from "@mastra/core/memory";
 import { Memory } from "@mastra/memory";
 import { LanguageDetector } from "@mastra/core/processors";
+import { createVectorQueryTool } from "@mastra/rag";
 import { env } from "../env";
 
 const municipalityName = env.MUNICIPALITY_NAME;
@@ -11,6 +14,20 @@ const municipalityWebsite = env.MUNICIPALITY_WEBSITE;
 const municipalityElectronicOfficeUrl = env.MUNICIPALITY_ELECTRONIC_OFFICE_URL;
 const municipalityChannel = env.MUNICIPALITY_CHANNEL;
 const municipalityPreferredLanguage = env.MUNICIPALITY_PREFERRED_LANGUAGE;
+
+const vectorQueryTool = createVectorQueryTool({
+  id: "municipal-knowledge-base",
+  description:
+    "Busca información factual en la base de conocimiento municipal indexada para responder consultas sobre trámites, servicios, horarios, ubicaciones y normativa local.",
+  vectorStoreName: "qdrant",
+  indexName: env.QDRANT_COLLECTION,
+  model: new ModelRouterEmbeddingModel(env.EMBED_MODEL),
+  includeSources: true,
+});
+
+// Some editors resolve @mastra/core through a different pnpm path than @mastra/memory,
+// which makes private-field types look incompatible even though the runtime instance is valid.
+const chatwootMemory = new Memory() as unknown as MastraMemory;
 
 export const chatwootAgent = new Agent({
   id: "chatwoot-agent",
@@ -154,7 +171,10 @@ export const chatwootAgent = new Agent({
   `;
   },
   model: env.LLM_MODEL,
-  memory: new Memory(),
+  tools: {
+    vectorQueryTool,
+  },
+  memory: chatwootMemory,
   inputProcessors: [
     new LanguageDetector({
       model: env.LLM_MODEL_SMALL,

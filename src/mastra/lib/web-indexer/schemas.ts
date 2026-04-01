@@ -7,9 +7,12 @@ export const webIndexerInputSchema = z.object({
 export type WebIndexerInput = z.infer<typeof webIndexerInputSchema>;
 
 export const crawledPageSchema = z.object({
+  id: z.string(),
   url: z.string(),
   title: z.string(),
   text: z.string().optional(),
+  translatedText: z.string().optional(),
+  detectedLang: z.string().optional(),
   httpStatus: z.number(),
   contentHash: z.string(),
   crawledAt: z.date(),

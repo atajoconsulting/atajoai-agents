@@ -11,6 +11,9 @@ export const env = createEnv({
     LLM_MODEL_SMALL: z.string().min(1),
     DATABASE_URL: z.string(),
     QDRANT_URL: z.string().default("http://localhost:6333"),
+    QDRANT_API_KEY: z.string().optional(),
+    QDRANT_COLLECTION: z.string().default("default"),
+    QDRANT_VECTOR_SIZE: z.coerce.number().int().positive().default(1024),
     NODE_ENV: z
       .enum(["development", "production", "test"])
       .default("development"),
