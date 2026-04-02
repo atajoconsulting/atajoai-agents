@@ -9,7 +9,11 @@ import {
 import { PostgresStore } from "@mastra/pg";
 import { chatwootWebhookWorkflow } from "./workflows/chatwoot-webhook";
 import { webIndexerWorkflow } from "./workflows/web-indexer";
-import { chatwootAgent } from "./agents/chatwoot-agent";
+import {
+  chatwootResponderAgent,
+  chatwootRouterAgent,
+} from "./agents/chatwoot-agent";
+import { localInfoRegisteredScorers } from "./scorers";
 import { translatorAgent } from "./agents/translator-agent";
 import { apiRoutes } from "./routes";
 import { env } from "./env";
@@ -17,7 +21,12 @@ import { env } from "./env";
 export const mastra = new Mastra({
   vectors: { qdrant: qdrantVector },
   workflows: { chatwootWebhookWorkflow, webIndexerWorkflow },
-  agents: { chatwootAgent, translatorAgent },
+  scorers: localInfoRegisteredScorers,
+  agents: {
+    chatwootRouterAgent,
+    chatwootResponderAgent,
+    translatorAgent,
+  },
   storage: new PostgresStore({
     id: "pg-storage",
     connectionString: env.DATABASE_URL,
