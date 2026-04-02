@@ -15,10 +15,8 @@ import {
   buildSensitiveReply,
   buildUnavailableHandoffReply,
   evaluateOutboundReply,
-  getOutboundStyleInstructions,
   judgeAnswerabilityResultSchema,
   localEvidenceSchema,
-  looksLikeLocalInfoQuery,
   routeMessageResultSchema,
   sanitizeReplyResultSchema,
 } from "../lib/outbound";
@@ -26,7 +24,8 @@ import { env } from "../env";
 import { sanitizeOutboundStepScorers } from "../scorers/local-info";
 
 const embedModel = new ModelRouterEmbeddingModel(env.EMBED_MODEL);
-const RETRIEVAL_TOP_K = 6;
+const RETRIEVAL_TOP_K = 12;
+const RETRIEVAL_FINAL_K = 4;
 
 export const chatwootWebhookSchema = z.object({
   event: z.string().describe("Webhook event type"),
@@ -64,6 +63,7 @@ const validationResultSchema = z.object({
 
 const routedResultSchema = validationResultSchema.extend({
   route: routeMessageResultSchema,
+  searchQuery: z.string(),
 });
 
 const retrievedResultSchema = routedResultSchema.extend({
@@ -138,25 +138,6 @@ function formatEvidenceForPrompt(
     .join("\n\n");
 }
 
-function applyLocalIntentHeuristics(
-  messageContent: string,
-  route: z.infer<typeof routeMessageResultSchema>,
-) {
-  if (
-    route.intent === "out_of_scope" &&
-    route.sensitivity === "normal" &&
-    looksLikeLocalInfoQuery(messageContent)
-  ) {
-    return {
-      ...route,
-      intent: "local_factual" as const,
-      requiresRetrieval: true,
-      requiresClarification: false,
-    };
-  }
-
-  return route;
-}
 
 function getJudgementForNonFactualRoute(
   route: z.infer<typeof routeMessageResultSchema>,
@@ -271,13 +252,32 @@ async function retrieveLocalEvidence({
       continue;
     }
 
+    // Dedup by exact chunk identity
     const key = `${parsed.data.documentId}:${parsed.data.chunkIndex}`;
-    if (!deduped.has(key)) {
+    if (deduped.has(key)) {
+      continue;
+    }
+
+    // Dedup overlapping chunks from the same document (adjacent indices)
+    let isOverlapping = false;
+    for (const existing of deduped.values()) {
+      if (
+        existing.documentId === parsed.data.documentId &&
+        Math.abs(existing.chunkIndex - parsed.data.chunkIndex) <= 1
+      ) {
+        isOverlapping = true;
+        break;
+      }
+    }
+
+    if (!isOverlapping) {
       deduped.set(key, parsed.data);
     }
   }
 
-  return Array.from(deduped.values()).sort((a, b) => b.score - a.score);
+  return Array.from(deduped.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, RETRIEVAL_FINAL_K);
 }
 
 const validateWebhook = createStep({
@@ -286,21 +286,27 @@ const validateWebhook = createStep({
     "Validates the incoming Chatwoot webhook and extracts relevant data",
   inputSchema: chatwootWebhookSchema,
   outputSchema: validationResultSchema,
-  execute: async ({ inputData }) => {
+  execute: async ({ inputData, abort }) => {
+
     const skip = {
       shouldProcess: false,
-      accountId: inputData.account.id,
-      conversationId: inputData.conversation.id,
+      accountId: 0,
+      conversationId: 0,
       messageContent: "",
       senderName: "",
       threadId: "",
       resourceId: "",
-    };
+    }
 
-    if (inputData.event !== "message_created") return skip;
-    if (inputData.message_type !== "incoming") return skip;
-    if (inputData.private) return skip;
-    if (!inputData.content?.trim()) return skip;
+    if (
+      inputData.event !== "message_created" ||
+      inputData.message_type !== "incoming" ||
+      inputData.private ||
+      !inputData.content?.trim()
+    ) {
+      abort();
+      return skip;
+    }
 
     return {
       shouldProcess: true,
@@ -321,7 +327,11 @@ const routeMessage = createStep({
   outputSchema: routedResultSchema,
   execute: async ({ inputData, mastra }) => {
     if (!inputData.shouldProcess) {
-      return { ...inputData, route: getDefaultRoute() };
+      return {
+        ...inputData,
+        route: getDefaultRoute(),
+        searchQuery: inputData.messageContent,
+      };
     }
 
     const router = mastra?.getAgent("chatwootRouterAgent");
@@ -329,36 +339,55 @@ const routeMessage = createStep({
       throw new Error("Chatwoot router agent not found");
     }
 
+    const memoryOptions = {
+      thread: inputData.threadId,
+      resource: inputData.resourceId,
+      options: { lastMessages: 4, readOnly: true },
+    };
+
     const response = await router.generate(
       [
         {
           role: "user",
-          content: [
-            "Clasifique el siguiente mensaje ciudadano.",
-            "Devuelva solo el objeto estructurado solicitado.",
-            `Mensaje: ${inputData.messageContent}`,
-          ].join("\n\n"),
+          content: `Clasifique el siguiente mensaje ciudadano.\n\nMensaje: ${inputData.messageContent}`,
         },
       ],
       {
         maxSteps: 1,
-        modelSettings: {
-          temperature: 0,
-        },
+        memory: memoryOptions,
         structuredOutput: {
           schema: routeMessageResultSchema,
-          jsonPromptInjection: true,
         },
       },
     );
 
-    return {
-      ...inputData,
-      route: applyLocalIntentHeuristics(
-        inputData.messageContent,
-        routeMessageResultSchema.parse(response.object),
-      ),
-    };
+    const route = routeMessageResultSchema.parse(response.object);
+
+    let searchQuery = inputData.messageContent;
+    if (route.requiresRetrieval) {
+      const rewriteResponse = await router.generate(
+        [
+          {
+            role: "user",
+            content: [
+              "Reescribe la siguiente consulta ciudadana como una búsqueda autocontenida.",
+              "Si la consulta hace referencia a mensajes anteriores de la conversación, resuelve las referencias para que la búsqueda sea comprensible sin contexto previo.",
+              "Si la consulta ya es autocontenida, devuélvela tal cual.",
+              "Devuelve solo el texto de búsqueda, sin explicaciones.",
+              `\nConsulta: ${inputData.messageContent}`,
+            ].join("\n"),
+          },
+        ],
+        {
+          maxSteps: 1,
+          memory: memoryOptions,
+          modelSettings: { temperature: 0, maxOutputTokens: 100 },
+        },
+      );
+      searchQuery = rewriteResponse.text.trim() || inputData.messageContent;
+    }
+
+    return { ...inputData, route, searchQuery };
   },
 });
 
@@ -374,7 +403,7 @@ const retrieveContext = createStep({
 
     const evidence = await retrieveLocalEvidence({
       mastra,
-      queryText: inputData.messageContent,
+      queryText: inputData.searchQuery,
     });
 
     return {
@@ -412,18 +441,16 @@ const judgeAnswerability = createStep({
       };
     }
 
-    const router = mastra?.getAgent("chatwootRouterAgent");
-    if (!router) {
-      throw new Error("Chatwoot router agent not found");
+    const judge = mastra?.getAgent("answerabilityJudgeAgent");
+    if (!judge) {
+      throw new Error("Answerability judge agent not found");
     }
 
-    const response = await router.generate(
+    const response = await judge.generate(
       [
         {
           role: "user",
           content: [
-            "Evalúe si la evidencia recuperada basta para responder a la consulta con seguridad.",
-            "Si falta información esencial, marque answerable=false y use un fallback conservador.",
             `Consulta: ${inputData.messageContent}`,
             `Evidencia:\n${formatEvidenceForPrompt(inputData.evidence)}`,
           ].join("\n\n"),
@@ -431,12 +458,13 @@ const judgeAnswerability = createStep({
       ],
       {
         maxSteps: 1,
-        modelSettings: {
-          temperature: 0,
+        memory: {
+          thread: inputData.threadId,
+          resource: inputData.resourceId,
+          options: { lastMessages: 4, readOnly: true },
         },
         structuredOutput: {
           schema: judgeAnswerabilityResultSchema,
-          jsonPromptInjection: true,
         },
       },
     );
@@ -543,15 +571,9 @@ const composeCitizenReply = createStep({
         {
           role: "user",
           content: [
-            "Redacte la respuesta final para la ciudadanía.",
             `Consulta del ciudadano: ${inputData.messageContent}`,
-            `Use solo esta evidencia:\n${formatEvidenceForPrompt(
-              inputData.evidence,
-            )}`,
-            `Política del canal: ${getOutboundStyleInstructions()}`,
-            "Si la consulta está formulada de manera subjetiva, no haga rankings ni preferencias personales; limite la respuesta a opciones factuales presentes en la evidencia.",
-            "Si alguna parte no está completamente confirmada, indíquelo y remita al contacto municipal.",
-            "Devuelva solo el texto final.",
+            `<evidencia>\n${formatEvidenceForPrompt(inputData.evidence)}\n</evidencia>`,
+            `Confianza en la evidencia: ${inputData.judgement.confidence}`,
           ].join("\n\n"),
         },
       ],
@@ -562,7 +584,7 @@ const composeCitizenReply = createStep({
           resource: inputData.resourceId,
         },
         modelSettings: {
-          temperature: 0.2,
+          temperature: 0.1,
           maxOutputTokens: 350,
         },
       },
@@ -598,6 +620,7 @@ const sanitizeReply = createStep({
     }
 
     const initialCheck = evaluateOutboundReply(inputData.draftReply);
+
     if (initialCheck.isSafeForOutbound) {
       return {
         ...inputData,
@@ -616,12 +639,11 @@ const sanitizeReply = createStep({
         {
           role: "user",
           content: [
-            "Reescriba este borrador para un canal ciudadano multicanal.",
-            `Problema detectado: ${initialCheck.reason}`,
+            `Reescriba este borrador. Problema detectado: ${initialCheck.reason}`,
             `Consulta original: ${inputData.messageContent}`,
+            `<evidencia>\n${formatEvidenceForPrompt(inputData.evidence)}\n</evidencia>`,
             `Borrador a reparar:\n${inputData.draftReply}`,
-            `Política del canal: ${getOutboundStyleInstructions()}`,
-            "Devuelva solo el texto final para la ciudadanía, sin explicar cambios.",
+            "Devuelva solo el texto final corregido.",
           ].join("\n\n"),
         },
       ],

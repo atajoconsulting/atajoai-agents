@@ -96,7 +96,7 @@ export function getOutboundStyleInstructions(
   return [
     "Use un formato breve y estructurado para canales de atención ciudadana.",
     "Como norma general, limite la respuesta a 4-6 líneas.",
-    "Si necesita enumerar pasos, lugares o documentos, use como máximo 3 viñetas con '- '.",
+    "Si necesita enumerar pasos, lugares o documentos, use como máximo 5 viñetas con '- '.",
     "Nunca use tablas, JSON, nombres de tools ni markdown complejo.",
     "Si la consulta pide una valoración subjetiva, no haga rankings personales; ofrezca solo opciones factuales presentes en la base.",
   ].join(" ");
@@ -180,7 +180,7 @@ export function evaluateOutboundReply(text: string): SanitizeReplyResult {
     };
   }
 
-  if (bulletCount > 3) {
+  if (bulletCount > 5) {
     return {
       isSafeForOutbound: false,
       reason: "too_many_bullets",

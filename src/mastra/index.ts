@@ -13,6 +13,7 @@ import {
   chatwootResponderAgent,
   chatwootRouterAgent,
 } from "./agents/chatwoot-agent";
+import { answerabilityJudgeAgent } from "./agents/answerability-judge-agent";
 import { localInfoRegisteredScorers } from "./scorers";
 import { translatorAgent } from "./agents/translator-agent";
 import { apiRoutes } from "./routes";
@@ -25,6 +26,7 @@ export const mastra = new Mastra({
   agents: {
     chatwootRouterAgent,
     chatwootResponderAgent,
+    answerabilityJudgeAgent,
     translatorAgent,
   },
   storage: new PostgresStore({

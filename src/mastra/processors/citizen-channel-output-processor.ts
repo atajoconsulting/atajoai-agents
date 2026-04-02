@@ -52,6 +52,7 @@ export class CitizenChannelOutputProcessor extends BaseProcessor<"citizen-channe
           "La salida no cumple las reglas del canal ciudadano.",
           `Problema detectado: ${evaluation.reason}.`,
           "Reescriba la respuesta como texto simple, breve, factual y sin JSON, tool calls ni markdown complejo.",
+          "Use únicamente datos que aparezcan literalmente en la evidencia suministrada. No invente nombres de lugares, direcciones, horarios ni URLs.",
         ].join(" "),
         { retry: true, metadata: { evaluation } },
       );
