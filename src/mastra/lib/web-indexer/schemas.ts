@@ -11,7 +11,7 @@ export const crawledPageSchema = z.object({
   url: z.string(),
   title: z.string(),
   text: z.string().optional(),
-  translatedText: z.string().optional(),
+  /** ISO 639-1 code detected during crawl, e.g. "ca", "eu", "en" */
   detectedLang: z.string().optional(),
   httpStatus: z.number(),
   contentHash: z.string(),

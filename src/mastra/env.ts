@@ -27,6 +27,7 @@ export const env = createEnv({
     LLM_MODEL_MEDIUM: z.string().min(1),
     LLM_MODEL_SMALL: z.string().min(1),
     DATABASE_URL: z.string(),
+    MISTRAL_API_KEY: z.string().optional(),
     QDRANT_URL: z.string().default("http://localhost:6333"),
     QDRANT_API_KEY: z.string().optional(),
     QDRANT_COLLECTION: z.string().default("default"),

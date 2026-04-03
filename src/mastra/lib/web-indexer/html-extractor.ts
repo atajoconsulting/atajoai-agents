@@ -35,8 +35,6 @@ const MAIN_CONTENT_SELECTORS = [
   ".page-content",
 ];
 
-// ─── Helpers ────────────────────────────────────────────────────────────────────
-
 /**
  * Resolve a potentially relative URL against the page's base URL.
  * Returns the href untouched when baseUrl is not provided or parsing fails.
@@ -69,7 +67,6 @@ function toStructuredText(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function walk(nodes: cheerio.Cheerio<any>): void {
     nodes.contents().each((_, node) => {
-      // --- Text node ---
       if (node.type === "text") {
         const t = ((node as any).data as string) ?? "";
         // collapse inner whitespace but keep a single space
@@ -85,7 +82,6 @@ function toStructuredText(
 
       const $el = $(el);
 
-      // --- Headings → markdown headings ---
       if (/^h[1-6]$/.test(tag)) {
         const level = Number(tag[1]);
         const prefix = "#".repeat(level);
@@ -94,7 +90,6 @@ function toStructuredText(
         return;
       }
 
-      // --- Images → alt text annotation ---
       if (tag === "img") {
         const alt = ($el.attr("alt") ?? "").trim();
         const src = $el.attr("src") ?? "";
@@ -105,7 +100,6 @@ function toStructuredText(
         return;
       }
 
-      // --- Links → inline with resolved URL ---
       if (tag === "a") {
         const href = $el.attr("href") ?? "";
         const label = $el.text().replace(/\s+/g, " ").trim();
@@ -123,7 +117,6 @@ function toStructuredText(
         return;
       }
 
-      // --- Lists — recurse into each <li> so nested links are resolved ---
       if (tag === "ul" || tag === "ol") {
         parts.push("\n");
         let idx = 0;
@@ -144,21 +137,18 @@ function toStructuredText(
         return;
       }
 
-      // --- Table cells → separate with " | " ---
       if (tag === "td" || tag === "th") {
         const inner = toStructuredText($, $el, baseUrl).replace(/\n+/g, " ").trim();
         if (inner) parts.push(` ${inner} |`);
         return;
       }
 
-      // --- Table rows → newline per row ---
       if (tag === "tr") {
         parts.push("\n|");
         walk($el);
         return;
       }
 
-      // --- Tables → block with newlines ---
       if (tag === "table") {
         parts.push("\n");
         walk($el);
@@ -166,7 +156,6 @@ function toStructuredText(
         return;
       }
 
-      // --- Block elements → paragraph breaks ---
       const BLOCK_TAGS = new Set([
         "p", "div", "section", "blockquote", "figure", "figcaption",
         "details", "summary", "dt", "dd",
@@ -178,13 +167,11 @@ function toStructuredText(
         return;
       }
 
-      // --- <br> → newline ---
       if (tag === "br") {
         parts.push("\n");
         return;
       }
 
-      // --- Everything else: recurse ---
       walk($el);
     });
   }
@@ -199,8 +186,6 @@ function toStructuredText(
     .replace(/^ +/gm, "")          // trim leading spaces per line
     .trim();
 }
-
-// ─── Public API ─────────────────────────────────────────────────────────────────
 
 export function extractCleanText(
   html: string,

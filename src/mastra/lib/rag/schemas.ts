@@ -1,39 +1,25 @@
 import { z } from "zod";
 
-/**
- * A chunk is the unit stored and retrieved in the vector database.
- * Each document is split into one or more chunks before indexing.
- */
-export const ragChunkSchema = z.object({
-  /** Unique chunk id: typically "<documentId>-<chunkIndex>" */
-  id: z.string(),
-
-  /** Id of the parent document this chunk belongs to */
-  documentId: z.string(),
-
-  /** Chunk text content that gets embedded */
-  content: z.string(),
-
-  /** Zero-based position of this chunk within the document */
-  chunkIndex: z.number().int().nonnegative(),
-});
+/** Source type enum shared across all RAG schemas */
+export const sourceTypeSchema = z.enum(["web", "pdf", "docx", "txt", "other"]);
+export type SourceType = z.infer<typeof sourceTypeSchema>;
 
 /**
  * A document is the top-level unit ingested into the RAG pipeline.
- * It maps 1:N to ragChunkSchema once split.
+ * It maps 1:N to chunks once split by the indexer.
+ *
+ * Note: translation is NOT done at document level — it happens per-chunk
+ * inside indexer.ts so that original text is preserved in Qdrant.
  */
 export const ragDocumentSchema = z.object({
-  /** Stable unique id — e.g. SHA-256 of the canonical source URL or file path */
+  /** Stable unique id — SHA-256 of the canonical source URL or file path */
   id: z.string(),
 
   /** Human-readable title */
   title: z.string(),
 
-  /** Full text content (original language) */
+  /** Full text content in original language */
   content: z.string(),
-
-  /** Translated content, populated only when content is not in Spanish */
-  translatedContent: z.string().optional(),
 
   /** ISO 639-1 language code of the original content, e.g. "es", "ca", "en" */
   lang: z.string().optional(),
@@ -41,8 +27,8 @@ export const ragDocumentSchema = z.object({
   /** Source URI: URL, file path, or any canonical reference */
   source: z.string(),
 
-  /** Where the document came from: web, pdf, docx, etc. */
-  sourceType: z.enum(["web", "pdf", "docx", "txt", "other"]).default("other"),
+  /** Where the document came from */
+  sourceType: sourceTypeSchema.default("other"),
 
   /** SHA-256 hash of the content — used to detect changes and skip re-indexing */
   contentHash: z.string(),
@@ -54,4 +40,29 @@ export const ragDocumentSchema = z.object({
 });
 
 export type RagDocument = z.infer<typeof ragDocumentSchema>;
-export type RagChunk = z.infer<typeof ragChunkSchema>;
+
+/**
+ * The payload stored per chunk in Qdrant.
+ * Matches exactly what indexer.ts writes and chatwoot-webhook.ts reads.
+ *
+ * Key fields:
+ * - content: original-language text (what the agent sees as evidence)
+ * - searchContent: Spanish text that was embedded (for search recall)
+ */
+export const qdrantChunkPayloadSchema = z.object({
+  documentId: z.string(),
+  title: z.string(),
+  source: z.string(),
+  sourceType: sourceTypeSchema,
+  /** Original language code */
+  lang: z.string(),
+  contentHash: z.string(),
+  chunkIndex: z.number().int().nonnegative(),
+  /** Original-language chunk text — shown to the agent as evidence */
+  content: z.string(),
+  /** Spanish chunk text — what was embedded, kept for debugging/audit */
+  searchContent: z.string(),
+  indexedAt: z.string(),
+});
+
+export type QdrantChunkPayload = z.infer<typeof qdrantChunkPayloadSchema>;

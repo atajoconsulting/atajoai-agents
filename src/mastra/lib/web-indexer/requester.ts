@@ -26,7 +26,8 @@ export async function fetchPage(
     const html = await res.text();
     return { html, status: res.status, contentType };
   } catch (error) {
-    console.log(error);
+    const msg = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`[requester] Failed to fetch ${url}: ${msg}\n`);
     return null;
   }
 }

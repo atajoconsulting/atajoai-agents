@@ -1,3 +1,8 @@
+/**
+ * @deprecated Dead code — this tool is not registered in any agent.
+ * Message sending is handled directly via `lib/chatwoot-api.ts` in the workflow.
+ * Safe to delete this file.
+ */
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { sendChatwootMessage } from "../lib/chatwoot-api";

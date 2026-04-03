@@ -1,4 +1,11 @@
 import { registerApiRoute } from '@mastra/core/server';
+import { sendChatwootMessage } from '../lib/chatwoot-api';
+import { env } from '../env';
+
+/** Fallback message sent to the citizen when the workflow throws unexpectedly. */
+const WORKFLOW_ERROR_FALLBACK =
+  `Lo sentimos, ha ocurrido un error procesando tu mensaje. ` +
+  `Por favor, inténtalo de nuevo o contacta con nosotros en el ${env.MUNICIPALITY_PHONE}.`;
 
 export const chatwootRoutes = [
   registerApiRoute('/chatwoot/webhook', {
@@ -18,7 +25,15 @@ export const chatwootRoutes = [
                 content: { type: 'string' },
                 message_type: { type: 'string' },
                 private: { type: 'boolean' },
-                sender: {}
+                sender: {},
+                account: {
+                  type: 'object',
+                  properties: { id: { type: 'number' } },
+                },
+                conversation: {
+                  type: 'object',
+                  properties: { id: { type: 'number' } },
+                },
               }
             },
           }
@@ -32,15 +47,33 @@ export const chatwootRoutes = [
 
       logger.info('Received event:', { event: body.event });
 
+      const accountId: number | undefined = body.account?.id;
+      const conversationId: number | undefined = body.conversation?.id;
+
       const workflow = mastra.getWorkflow('chatwootWebhookWorkflow');
       const run = await workflow.createRun();
 
-      // Fire-and-forget: respond 200 inmediatamente para que Chatwoot no haga timeout
+      // Fire-and-forget: respond 200 immediately so Chatwoot doesn't time out.
+      // On failure, send a fallback message so the citizen is never left hanging.
       run.start({ inputData: body }).then((result: unknown) => {
         logger.info('Workflow completed', { result });
-
       }).catch((error: unknown) => {
-        logger.error('Workflow error', { error });
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error('Workflow error', { error: msg });
+
+        if (accountId !== undefined && conversationId !== undefined) {
+          sendChatwootMessage({
+            accountId,
+            conversationId,
+            content: WORKFLOW_ERROR_FALLBACK,
+          }).catch((sendErr: unknown) => {
+            const sendMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
+            process.stderr.write(
+              `[chatwoot-route] Failed to send fallback error message ` +
+              `(account=${accountId}, conversation=${conversationId}): ${sendMsg}\n`,
+            );
+          });
+        }
       });
 
       return c.json({ status: 'accepted' }, 200);

@@ -21,11 +21,15 @@ import {
   sanitizeReplyResultSchema,
 } from "../lib/outbound";
 import { env } from "../env";
+import { CHUNK_CONFIG } from "../lib/rag/chunker";
 import { sanitizeOutboundStepScorers } from "../scorers/local-info";
 
 const embedModel = new ModelRouterEmbeddingModel(env.EMBED_MODEL);
-const RETRIEVAL_TOP_K = 12;
-const RETRIEVAL_FINAL_K = 4;
+
+// Retrieval tuning — adjust these to balance recall vs. context window usage
+const RETRIEVAL_TOP_K = 12;   // initial candidates fetched from Qdrant
+const RETRIEVAL_FINAL_K = 4;  // final evidence chunks passed to the LLM
+const MAX_EVIDENCE_CHARS = CHUNK_CONFIG.maxSize; // keep in sync with chunker
 
 export const chatwootWebhookSchema = z.object({
   event: z.string().describe("Webhook event type"),
@@ -45,10 +49,10 @@ export const chatwootWebhookSchema = z.object({
     .optional(),
   account: z.object({
     id: z.number(),
-  }),
+  }).optional(),
   conversation: z.object({
     id: z.number(),
-  }),
+  }).optional(),
 });
 
 const validationResultSchema = z.object({
@@ -123,8 +127,8 @@ function formatEvidenceForPrompt(
   return evidence
     .map((chunk, index) => {
       const excerpt =
-        chunk.content.length > 900
-          ? `${chunk.content.slice(0, 900)}...`
+        chunk.content.length > MAX_EVIDENCE_CHARS
+          ? `${chunk.content.slice(0, MAX_EVIDENCE_CHARS)}...`
           : chunk.content;
 
       return [
@@ -225,6 +229,10 @@ async function retrieveLocalEvidence({
   queryText: string;
 }): Promise<z.infer<typeof localEvidenceSchema>[]> {
   const vectorStore = mastra.getVector("qdrant");
+  if (!vectorStore) {
+    process.stderr.write("[chatwoot-webhook] Qdrant vector store not registered — returning empty evidence\n");
+    return [];
+  }
   const { embeddings } = await embedModel.doEmbed({ values: [queryText] });
   const [queryVector] = embeddings;
   const results = await vectorStore.query({
@@ -302,7 +310,9 @@ const validateWebhook = createStep({
       inputData.event !== "message_created" ||
       inputData.message_type !== "incoming" ||
       inputData.private ||
-      !inputData.content?.trim()
+      !inputData.content?.trim() ||
+      !inputData.account ||
+      !inputData.conversation
     ) {
       abort();
       return skip;

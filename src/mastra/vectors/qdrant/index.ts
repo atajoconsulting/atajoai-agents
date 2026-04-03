@@ -40,9 +40,22 @@ async function ensureQdrantSetup(): Promise<void> {
       fieldName: "lang",
       fieldSchema: "keyword",
     }),
+    qdrantVector.createPayloadIndex({
+      indexName: env.QDRANT_COLLECTION,
+      fieldName: "searchContent",
+      fieldSchema: "text",
+    }),
   ]);
 }
 
-ensureQdrantSetup().catch((err) => {
-  console.error(`[qdrant] Failed to ensure collection/index setup:`, err);
-});
+export let qdrantReady = false;
+
+ensureQdrantSetup()
+  .then(() => {
+    qdrantReady = true;
+  })
+  .catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`[qdrant] FATAL: Failed to ensure collection/index setup: ${msg}\n`);
+    // Don't exit — Qdrant may become available later, but callers can check qdrantReady
+  });

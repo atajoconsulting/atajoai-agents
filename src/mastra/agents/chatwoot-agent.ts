@@ -16,8 +16,12 @@ const municipalityPreferredLanguage = env.MUNICIPALITY_PREFERRED_LANGUAGE;
 
 // Shared memory instance — all pipeline agents use the same threadId/resourceId
 // so they see conversation history automatically via Mastra's input processors.
-// Some editors resolve @mastra/core through a different pnpm path than @mastra/memory,
-// which makes private-field types look incompatible even though the runtime instance is valid.
+//
+// Type cast rationale: @mastra/memory's Memory class implements MastraMemory, but pnpm
+// may resolve @mastra/core to different physical paths for this package vs @mastra/memory,
+// making private-field types structurally incompatible at compile time even though the
+// runtime instance is fully valid. Running `pnpm dedupe` in the project root is the
+// permanent fix; the cast is safe until then.
 export const sharedMemory = new Memory({
   options: {
     lastMessages: 6,

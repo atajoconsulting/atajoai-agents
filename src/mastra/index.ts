@@ -9,6 +9,7 @@ import {
 import { PostgresStore } from "@mastra/pg";
 import { chatwootWebhookWorkflow } from "./workflows/chatwoot-webhook";
 import { webIndexerWorkflow } from "./workflows/web-indexer";
+import { documentIndexerWorkflow } from "./workflows/document-indexer";
 import {
   chatwootResponderAgent,
   chatwootRouterAgent,
@@ -18,10 +19,12 @@ import { localInfoRegisteredScorers } from "./scorers";
 import { translatorAgent } from "./agents/translator-agent";
 import { apiRoutes } from "./routes";
 import { env } from "./env";
+import { runStartupChecks } from "./lib/health";
 
 export const mastra = new Mastra({
+  // NOTE: runStartupChecks is called below after the instance is exported.
   vectors: { qdrant: qdrantVector },
-  workflows: { chatwootWebhookWorkflow, webIndexerWorkflow },
+  workflows: { chatwootWebhookWorkflow, webIndexerWorkflow, documentIndexerWorkflow },
   scorers: localInfoRegisteredScorers,
   agents: {
     chatwootRouterAgent,
@@ -52,4 +55,11 @@ export const mastra = new Mastra({
       },
     },
   }),
+});
+
+// Run connectivity checks asynchronously so they don't block the module
+// export or delay the server from starting. Results are logged to stderr.
+runStartupChecks(mastra.getLogger()).catch((err: unknown) => {
+  const msg = err instanceof Error ? err.message : String(err);
+  process.stderr.write(`[health] Unexpected error during startup checks: ${msg}\n`);
 });
