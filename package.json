@@ -1,47 +1,25 @@
 {
-  "name": "atajoai-agents",
+  "name": "atajoai",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "mastra dev",
-    "build": "mastra build",
-    "start": "mastra start"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "private": true,
   "packageManager": "pnpm@10.33.0",
-  "type": "module",
   "engines": {
     "node": ">=22.13.0"
   },
-  "dependencies": {
-    "@mastra/core": "^1.21.0",
-    "@mastra/evals": "^1.2.0",
-    "@mastra/libsql": "^1.7.3",
-    "@mastra/loggers": "^1.1.0",
-    "@mastra/memory": "^1.13.0",
-    "@mastra/observability": "^1.7.1",
-    "@mastra/pg": "^1.8.5",
-    "@mastra/qdrant": "^1.0.2",
-    "@mastra/rag": "^2.1.3",
-    "@mistralai/mistralai": "^2.1.2",
-    "@t3-oss/env-core": "^0.13.11",
-    "cheerio": "^1.2.0",
-    "cld3-asm": "^4.0.0",
-    "mammoth": "^1.12.0",
-    "pdf-parse": "^2.4.5",
-    "undici": "^7.24.6",
-    "uuid": "^13.0.0",
-    "zod": "^4.3.6"
+  "scripts": {
+    "build": "pnpm -r --filter @atajoai/db build && pnpm -r --filter '!@atajoai/db' build",
+    "dev:agents": "pnpm -r --filter @atajoai/agents dev",
+    "dev:panel": "pnpm -r --filter @atajoai/panel dev",
+    "db:migrate": "pnpm -r --filter @atajoai/db db:migrate",
+    "db:push": "pnpm -r --filter @atajoai/db db:push",
+    "db:studio": "pnpm -r --filter @atajoai/db db:studio"
   },
-  "devDependencies": {
-    "@types/node": "^25.5.0",
-    "@types/pdf-parse": "^1.1.5",
-    "@types/uuid": "^11.0.0",
-    "mastra": "^1.3.19",
-    "typescript": "^5.9.3"
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild"
+    ]
   }
 }

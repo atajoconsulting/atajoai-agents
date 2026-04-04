@@ -10,3 +10,12 @@ dist
 .vercel
 .idea
 /.pnpm-store/
+.next
+.env*
+!.env.project
+packages/agents/.agents
+packages/agents/.mastra
+packages/agents/node_modules
+packages/db/node_modules
+packages/panel/.next
+packages/panel/node_modules

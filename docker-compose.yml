@@ -1,0 +1,99 @@
+services:
+  agents:
+    build:
+      context: .
+      dockerfile: packages/agents/Dockerfile
+    networks: [internal]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      minio:
+        condition: service_started
+      redis:
+        condition: service_started
+    environment:
+      MASTRA_DATABASE_URL: postgresql://atajoai:${DB_PASSWORD}@postgres:5432/atajoai
+      DATABASE_URL: postgresql://atajoai:${DB_PASSWORD}@pgbouncer:6432/atajoai
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379
+      AWS_ENDPOINT_URL_S3: http://minio:9000
+    env_file: .env
+
+  panel:
+    build:
+      context: .
+      dockerfile: packages/panel/Dockerfile
+    ports: ["3000:3000"]
+    networks: [internal]
+    depends_on:
+      pgbouncer:
+        condition: service_started
+      agents:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://atajoai:${DB_PASSWORD}@pgbouncer:6432/atajoai
+      MASTRA_INTERNAL_URL: http://agents:4111
+      AWS_ENDPOINT_URL_S3: http://minio:9000
+    env_file: .env
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    networks: [internal]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://atajoai:${DB_PASSWORD}@postgres:5432/atajoai
+      POOL_MODE: transaction
+      MAX_DB_CONNECTIONS: 25
+      DEFAULT_POOL_SIZE: 15
+      MAX_CLIENT_CONN: 100
+
+  postgres:
+    image: postgres:16-alpine
+    networks: [internal]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      POSTGRES_DB: atajoai
+      POSTGRES_USER: atajoai
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atajoai"]
+      interval: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    networks: [internal]
+    volumes: ["qdrantdata:/qdrant/storage"]
+
+  redis:
+    image: redis:7-alpine
+    networks: [internal]
+    volumes: ["redisdata:/data"]
+    command: redis-server --appendonly yes
+
+  minio:
+    image: minio/minio:latest
+    networks: [internal]
+    command: server /data --console-address ":9001"
+    volumes: ["miniodata:/data"]
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  pgdata:
+  qdrantdata:
+  redisdata:
+  miniodata:
