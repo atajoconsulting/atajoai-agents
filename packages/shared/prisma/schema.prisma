@@ -61,7 +61,7 @@ model IndexedDocument {
 model User {
   id            String    @id
   name          String
-  email         String
+  email         String    @unique
   emailVerified Boolean   @map("email_verified")
   image         String?
   role          String    @default("viewer")
@@ -81,6 +81,8 @@ model Session {
   id             String   @id
   expiresAt      DateTime @map("expires_at")
   token          String   @unique
+  createdAt      DateTime @map("created_at")
+  updatedAt      DateTime @map("updated_at")
   ipAddress      String?  @map("ip_address")
   userAgent      String?  @map("user_agent")
   userId         String   @map("user_id")

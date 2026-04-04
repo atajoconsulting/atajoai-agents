@@ -7,12 +7,14 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "build": "pnpm -r --filter @atajoai/db build && pnpm -r --filter '!@atajoai/db' build",
-    "dev:agents": "pnpm -r --filter @atajoai/agents dev",
-    "dev:panel": "pnpm -r --filter @atajoai/panel dev",
-    "db:migrate": "pnpm -r --filter @atajoai/db db:migrate",
-    "db:push": "pnpm -r --filter @atajoai/db db:push",
-    "db:studio": "pnpm -r --filter @atajoai/db db:studio"
+    "build": "pnpm -r --filter @atajoai/shared build && pnpm -r --filter '!@atajoai/shared' build",
+    "dev:agents": "dotenv -- pnpm -r --filter @atajoai/agents dev",
+    "dev:panel": "dotenv -- pnpm -r --filter @atajoai/panel dev",
+    "db:generate": "dotenv -- pnpm -r --filter @atajoai/shared db:generate",
+    "db:migrate": "dotenv -- pnpm -r --filter @atajoai/shared db:migrate",
+    "db:push": "dotenv -- pnpm -r --filter @atajoai/shared db:push",
+    "db:studio": "dotenv -- pnpm -r --filter @atajoai/shared db:studio",
+    "seed:admin": "dotenv -- pnpm -r --filter @atajoai/panel seed:admin"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -20,6 +22,14 @@
       "@prisma/engines",
       "prisma",
       "esbuild"
+    ],
+    "ignoredBuiltDependencies": [
+      "msw"
     ]
+  },
+  "devDependencies": {
+    "dotenv-cli": "^11.0.0",
+    "shadcn": "^4.1.2",
+    "tsx": "^4.21.0"
   }
 }

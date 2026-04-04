@@ -1,5 +1,5 @@
 import { Agent } from "@mastra/core/agent";
-import { env } from "../env";
+import { env } from "@atajoai/shared";
 import { sharedMemory } from "./chatwoot-agent";
 
 export const answerabilityJudgeAgent = new Agent({

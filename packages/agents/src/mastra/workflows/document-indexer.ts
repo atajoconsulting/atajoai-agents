@@ -10,7 +10,7 @@ import {
 import { fileToRagDocument, indexDocuments } from "../lib/rag";
 import type { RagDocument } from "../lib/rag";
 import { detectLang } from "../lib/language";
-import { env } from "../env";
+import { env } from "@atajoai/shared";
 
 export { documentIndexerInputSchema, documentIndexerOutputSchema };
 

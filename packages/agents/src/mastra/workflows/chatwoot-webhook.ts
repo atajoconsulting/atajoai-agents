@@ -1,7 +1,7 @@
 import { ModelRouterEmbeddingModel } from "@mastra/core/llm";
 import { createStep, createWorkflow } from "@mastra/core/workflows";
 import { z } from "zod";
-import type { AppConfig } from "@atajoai/db";
+import type { AppConfig } from "@atajoai/shared";
 import {
   assignChatwootConversation,
   sendChatwootMessage,
@@ -23,7 +23,7 @@ import {
   sanitizeReplyResultSchema,
 } from "../lib/outbound";
 import { getConfig } from "../lib/config";
-import { env } from "../env";
+import { env } from "@atajoai/shared";
 import { CHUNK_CONFIG } from "../lib/rag/chunker";
 import { sanitizeOutboundStepScorers } from "../scorers/local-info";
 

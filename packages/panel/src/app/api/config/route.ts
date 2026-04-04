@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAppConfig, updateAppConfig } from "@atajoai/db";
+import { getAppConfig, updateAppConfig } from "@atajoai/shared";
 import { configFormSchema } from "@/features/config/schema";
 import { invalidateConfigCache } from "@/lib/mastra-api";
 import { getRequestSession, hasWriteAccess } from "@/lib/request-auth";

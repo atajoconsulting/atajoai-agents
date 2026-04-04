@@ -4,7 +4,7 @@ import { v5 as uuidv5 } from "uuid";
 import { chunkText, type ChunkResult } from "./chunker";
 import { detectLang } from "../language";
 import type { RagDocument } from "./schemas";
-import { env } from "../../env";
+import { env } from "@atajoai/shared";
 
 const UUID_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"; // UUID v5 DNS namespace
 

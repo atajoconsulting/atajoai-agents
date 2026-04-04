@@ -1,8 +1,8 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { admin, createAccessControl } from "better-auth/plugins";
-import { prisma } from "@atajoai/db";
-import { env } from "@/env";
+import { prisma } from "@atajoai/shared";
+import { env } from "@atajoai/shared";
 
 const isBuildPhase =
   process.env.npm_lifecycle_event === "build" ||

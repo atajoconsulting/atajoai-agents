@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@atajoai/db";
+import { prisma } from "@atajoai/shared";
 import { enqueueDeleteDocument } from "@/lib/mastra-api";
 import { getRequestSession, hasWriteAccess } from "@/lib/request-auth";
 

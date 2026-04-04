@@ -1,34 +1,17 @@
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { env } from "./env";
 
 let sharedS3Client: S3Client | undefined;
-let resolvedBucket: string | undefined;
-
-function getS3Region(): string {
-  const region = process.env.AWS_REGION;
-  if (!region) {
-    throw new Error("AWS_REGION environment variable is required");
-  }
-  return region;
-}
-
-function getS3Bucket(): string {
-  if (!resolvedBucket) {
-    const bucket = process.env.S3_BUCKET;
-    if (!bucket) {
-      throw new Error("S3_BUCKET environment variable is required");
-    }
-    resolvedBucket = bucket;
-  }
-
-  return resolvedBucket;
-}
-
-export const S3_BUCKET = process.env.S3_BUCKET ?? "";
 
 export function getSharedS3Client(): S3Client {
   if (!sharedS3Client) {
     sharedS3Client = new S3Client({
-      region: getS3Region(),
+      region: env.AWS_REGION,
       forcePathStyle: true,
     });
   }
@@ -43,7 +26,7 @@ export async function putObjectBuffer(input: {
 }): Promise<void> {
   await getSharedS3Client().send(
     new PutObjectCommand({
-      Bucket: getS3Bucket(),
+      Bucket: env.S3_BUCKET,
       Key: input.key,
       Body: input.body,
       ContentType: input.contentType,
@@ -54,7 +37,7 @@ export async function putObjectBuffer(input: {
 export async function getObjectBuffer(key: string): Promise<Buffer> {
   const response = await getSharedS3Client().send(
     new GetObjectCommand({
-      Bucket: getS3Bucket(),
+      Bucket: env.S3_BUCKET,
       Key: key,
     }),
   );
@@ -79,7 +62,7 @@ export async function getObjectBuffer(key: string): Promise<Buffer> {
 export async function deleteObjectByKey(key: string): Promise<void> {
   await getSharedS3Client().send(
     new DeleteObjectCommand({
-      Bucket: getS3Bucket(),
+      Bucket: env.S3_BUCKET,
       Key: key,
     }),
   );

@@ -1,5 +1,5 @@
 {
-  "name": "@atajoai/db",
+  "name": "@atajoai/shared",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "prisma generate",
+    "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:studio": "prisma studio"
@@ -16,7 +17,9 @@
     "@aws-sdk/client-s3": "^3.717.0",
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
-    "pg": "^8.16.0"
+    "@t3-oss/env-core": "^0.12.0",
+    "pg": "^8.16.0",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",

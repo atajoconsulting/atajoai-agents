@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: [
-    "@atajoai/db",
+    "@atajoai/shared",
     "pg",
     "@prisma/adapter-pg",
     "@prisma/client",

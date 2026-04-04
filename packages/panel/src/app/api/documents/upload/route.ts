@@ -6,7 +6,7 @@ import {
   contentTypeFromSourceType,
   inferSourceType,
   validateDocumentBuffer,
-} from "@atajoai/db";
+} from "@atajoai/shared";
 import { enqueueFileIndexDocument } from "@/lib/mastra-api";
 import { getRequestSession, hasWriteAccess } from "@/lib/request-auth";
 

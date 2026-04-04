@@ -1,4 +1,4 @@
-import type { AppConfig } from "@atajoai/db";
+import type { AppConfig } from "@atajoai/shared";
 import { getOutboundStyleInstructions } from "./outbound";
 
 export function buildRouterInstructions(config: AppConfig): string {

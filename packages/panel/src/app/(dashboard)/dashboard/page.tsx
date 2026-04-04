@@ -1,4 +1,4 @@
-import { prisma } from "@atajoai/db";
+import { prisma } from "@atajoai/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function DashboardPage() {

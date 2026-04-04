@@ -1,6 +1,4 @@
-import pg from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@atajoai/shared";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { admin, createAccessControl } from "better-auth/plugins";
@@ -10,14 +8,6 @@ for (const name of ["DATABASE_URL", "BETTER_AUTH_SECRET"]) {
     throw new Error(`${name} environment variable is required`);
   }
 }
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 2,
-});
-
-const adapter = new PrismaPg(pool, { schema: "app" });
-const prisma = new PrismaClient({ adapter });
 
 const accessControl = createAccessControl({
   user: [
@@ -98,5 +88,4 @@ try {
   }
 } finally {
   await prisma.$disconnect();
-  await pool.end();
 }

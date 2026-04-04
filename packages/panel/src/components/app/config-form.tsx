@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { AppConfig } from "@atajoai/db";
+import type { AppConfig } from "@atajoai/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";

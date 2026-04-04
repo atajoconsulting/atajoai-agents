@@ -1,5 +1,5 @@
-import { getAppConfig } from "@atajoai/db";
-import type { AppConfig } from "@atajoai/db";
+import { getAppConfig } from "@atajoai/shared";
+import type { AppConfig } from "@atajoai/shared";
 import { redis } from "./redis";
 
 const CACHE_KEY = "app:config";

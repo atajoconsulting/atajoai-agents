@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.717.0",
-    "@atajoai/db": "workspace:*",
+    "@atajoai/shared": "workspace:*",
     "@mastra/core": "^1.21.0",
     "@mastra/evals": "^1.2.0",
     "@mastra/libsql": "^1.7.3",

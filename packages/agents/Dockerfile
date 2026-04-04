@@ -9,17 +9,17 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Copy package.json for each workspace package (cache layer)
-COPY packages/db/package.json packages/db/
+COPY packages/shared/package.json packages/shared/
 COPY packages/agents/package.json packages/agents/
 
 # Install all dependencies
 RUN pnpm install --frozen-lockfile
 
 # Copy db package (needed for prisma generate + shared types)
-COPY packages/db/ packages/db/
+COPY packages/shared/ packages/shared/
 
 # Generate Prisma client
-RUN pnpm --filter @atajoai/db build
+RUN pnpm --filter @atajoai/shared build
 
 # Copy agents source
 COPY packages/agents/tsconfig.json packages/agents/

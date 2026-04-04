@@ -1,4 +1,4 @@
-import { env } from "@/env";
+import { env } from "@atajoai/shared";
 
 async function mastraFetch(path: string, options?: RequestInit) {
   const url = `${env.MASTRA_INTERNAL_URL}${path}`;

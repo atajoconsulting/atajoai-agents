@@ -6,13 +6,13 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
-    "seed:admin": "node ./scripts/seed-admin.mjs"
+    "seed:admin": "tsx ./scripts/seed-admin.mjs"
   },
   "engines": {
     "node": ">=22.13.0"
   },
   "dependencies": {
-    "@atajoai/db": "workspace:*",
+    "@atajoai/shared": "workspace:*",
     "@aws-sdk/client-s3": "^3.717.0",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-checkbox": "^1.1.2",
@@ -24,8 +24,8 @@
     "@radix-ui/react-slot": "^1.1.2",
     "@radix-ui/react-switch": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.4",
-    "@tanstack/react-table": "^8.20.5",
     "@t3-oss/env-nextjs": "^0.13.11",
+    "@tanstack/react-table": "^8.20.5",
     "better-auth": "^1.2.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

@@ -13,7 +13,7 @@ import type { CrawledPage } from "../lib/web-indexer";
 import { fetchPage } from "../lib/web-indexer/requester";
 import { detectLang } from "../lib/language";
 import { toRagDocument, indexDocuments } from "../lib/rag";
-import { env } from "../env";
+import { env } from "@atajoai/shared";
 
 const crawlPages = createStep({
   id: "crawl-pages",

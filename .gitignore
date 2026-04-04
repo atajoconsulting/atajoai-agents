@@ -15,7 +15,9 @@ dist
 !.env.project
 packages/agents/.agents
 packages/agents/.mastra
+packages/agents/src/mastra/public/dist
 packages/agents/node_modules
-packages/db/node_modules
+packages/shared/node_modules
 packages/panel/.next
 packages/panel/node_modules
+packages/shared/src/generated

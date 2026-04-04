@@ -6,7 +6,7 @@ const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse") as (
   buffer: Buffer,
 ) => Promise<{ text: string; numpages: number; info: Record<string, unknown> }>;
-import { env } from "../../env";
+import { env } from "@atajoai/shared";
 
 export interface PdfExtractResult {
   text: string;

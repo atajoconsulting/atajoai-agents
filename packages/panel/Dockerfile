@@ -6,13 +6,13 @@ RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY packages/db/package.json packages/db/
+COPY packages/shared/package.json packages/shared/
 COPY packages/panel/package.json packages/panel/
 
 RUN pnpm install --frozen-lockfile
 
-COPY packages/db/ packages/db/
-RUN pnpm --filter @atajoai/db build
+COPY packages/shared/ packages/shared/
+RUN pnpm --filter @atajoai/shared build
 
 COPY packages/panel/ packages/panel/
 RUN pnpm --filter @atajoai/panel build

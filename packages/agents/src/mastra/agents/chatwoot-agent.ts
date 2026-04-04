@@ -1,7 +1,7 @@
 import { Agent } from "@mastra/core/agent";
 import type { MastraMemory } from "@mastra/core/memory";
 import { Memory } from "@mastra/memory";
-import { env } from "../env";
+import { env } from "@atajoai/shared";
 import { getConfigSync } from "../lib/config";
 import { buildRouterInstructions, buildResponderInstructions } from "../lib/instructions";
 import { CitizenChannelOutputProcessor } from "../processors/citizen-channel-output-processor";

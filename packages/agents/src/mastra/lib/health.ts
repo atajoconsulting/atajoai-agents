@@ -6,7 +6,7 @@
  * Failures are logged but never throw — the server still starts so that the
  * /health endpoint (or Mastra's built-in diagnostics) can surface the issue.
  */
-import { env } from "../env";
+import { env } from "@atajoai/shared";
 import { redis } from "./redis";
 
 type Logger = { info: (msg: string) => void; warn: (msg: string) => void };

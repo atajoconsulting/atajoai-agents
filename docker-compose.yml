@@ -17,7 +17,7 @@ services:
         condition: service_started
     environment:
       MASTRA_DATABASE_URL: postgresql://atajoai:${DB_PASSWORD}@postgres:5432/atajoai
-      DATABASE_URL: postgresql://atajoai:${DB_PASSWORD}@pgbouncer:6432/atajoai
+      DATABASE_URL: postgresql://atajoai:${DB_PASSWORD}@pgbouncer:5432/atajoai
       QDRANT_URL: http://qdrant:6333
       REDIS_URL: redis://redis:6379
       AWS_ENDPOINT_URL_S3: http://minio:9000
@@ -35,7 +35,7 @@ services:
       agents:
         condition: service_started
     environment:
-      DATABASE_URL: postgresql://atajoai:${DB_PASSWORD}@pgbouncer:6432/atajoai
+      DATABASE_URL: postgresql://atajoai:${DB_PASSWORD}@pgbouncer:5432/atajoai
       MASTRA_INTERNAL_URL: http://agents:4111
       AWS_ENDPOINT_URL_S3: http://minio:9000
     env_file: .env
@@ -46,8 +46,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    ports: ["6432:5432"]
     environment:
       DATABASE_URL: postgresql://atajoai:${DB_PASSWORD}@postgres:5432/atajoai
+      AUTH_TYPE: scram-sha-256
       POOL_MODE: transaction
       MAX_DB_CONNECTIONS: 25
       DEFAULT_POOL_SIZE: 15

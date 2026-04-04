@@ -1,8 +1,8 @@
+export { env } from "./env";
 export { prisma } from "./client";
 export { getAppConfig, updateAppConfig } from "./config";
 export { encrypt, decrypt } from "./crypto";
 export {
-  S3_BUCKET,
   deleteObjectByKey,
   getObjectBuffer,
   getSharedS3Client,

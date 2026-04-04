@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AppConfig } from "@atajoai/db";
+import type { AppConfig } from "@atajoai/shared";
 
 export const localIntentSchema = z.enum([
   "local_factual",

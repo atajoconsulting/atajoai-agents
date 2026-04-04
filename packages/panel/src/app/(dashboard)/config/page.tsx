@@ -1,4 +1,4 @@
-import { getAppConfig } from "@atajoai/db";
+import { getAppConfig } from "@atajoai/shared";
 import { ConfigForm } from "@/components/app/config-form";
 
 export default async function ConfigPage() {

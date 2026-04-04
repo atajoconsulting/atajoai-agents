@@ -1,5 +1,5 @@
 import { QdrantVector } from "@mastra/qdrant";
-import { env } from "../../env";
+import { env } from "@atajoai/shared";
 
 export const qdrantVector = new QdrantVector({
   id: "qdrant",

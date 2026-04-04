@@ -6,7 +6,7 @@ import {
   createFaithfulnessScorer,
   createTrajectoryScorerCode,
 } from "@mastra/evals/scorers/prebuilt";
-import { env } from "../env";
+import { env } from "@atajoai/shared";
 import {
   evaluateOutboundReply,
   isSubjectiveLocalQuery,

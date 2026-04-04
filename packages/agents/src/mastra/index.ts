@@ -18,14 +18,14 @@ import { answerabilityJudgeAgent } from "./agents/answerability-judge-agent";
 import { localInfoRegisteredScorers } from "./scorers";
 import { translatorAgent } from "./agents/translator-agent";
 import { apiRoutes } from "./routes";
-import { env } from "./env";
+import { env } from "@atajoai/shared";
 import { runStartupChecks } from "./lib/health";
 import { startDocumentJobs } from "./lib/jobs";
 
 export const mastra = new Mastra({
   bundler: {
     externals: [
-      "@atajoai/db",
+      "@atajoai/shared",
       "@prisma",
       "@prisma/adapter-pg",
       "@prisma/client",

@@ -1,7 +1,7 @@
 import type { Mastra } from "@mastra/core/mastra";
-import { deleteObjectByKey, getObjectBuffer, prisma } from "@atajoai/db";
+import { deleteObjectByKey, getObjectBuffer, prisma } from "@atajoai/shared";
 import PgBoss from "pg-boss";
-import { env } from "../env";
+import { env } from "@atajoai/shared";
 import { contentTypeFromSourceType, type DocumentSourceType, validateDocumentBuffer } from "./document-files";
 
 const INDEX_URL_JOB = "index-web";

@@ -43,6 +43,10 @@ export function UsersClient({ currentUserId }: Props) {
 
   async function loadUsers() {
     const response = await fetch("/api/auth/admin/list-users?limit=100&sortBy=createdAt&sortDirection=desc");
+    if (!response.ok) {
+      setIsLoading(false);
+      return;
+    }
     const payload = (await response.json()) as { users: UserRecord[] };
     setUsers(payload.users);
     setIsLoading(false);

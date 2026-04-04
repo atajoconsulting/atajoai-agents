@@ -1,8 +1,7 @@
 import { prisma } from "./client";
 import { decrypt, encrypt } from "./crypto";
+import { env } from "./env";
 import type { Prisma } from "@prisma/client";
-
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 export async function getAppConfig() {
   let config = await prisma.appConfig.findUnique({ where: { id: 1 } });
@@ -11,11 +10,14 @@ export async function getAppConfig() {
     config = await prisma.appConfig.create({ data: { id: 1 } });
   }
 
-  if (config.chatwootApiToken && ENCRYPTION_KEY) {
+  if (config.chatwootApiToken && env.ENCRYPTION_KEY) {
     try {
       config = {
         ...config,
-        chatwootApiToken: decrypt(config.chatwootApiToken, ENCRYPTION_KEY),
+        chatwootApiToken: decrypt(
+          config.chatwootApiToken,
+          env.ENCRYPTION_KEY,
+        ),
       };
     } catch {
       // Token might not be encrypted yet (migration from plaintext)
@@ -28,10 +30,10 @@ export async function getAppConfig() {
 export async function updateAppConfig(data: Prisma.AppConfigUpdateInput) {
   const updateData = { ...data };
 
-  if (typeof updateData.chatwootApiToken === "string" && ENCRYPTION_KEY) {
+  if (typeof updateData.chatwootApiToken === "string" && env.ENCRYPTION_KEY) {
     updateData.chatwootApiToken = encrypt(
       updateData.chatwootApiToken,
-      ENCRYPTION_KEY,
+      env.ENCRYPTION_KEY,
     );
   }
 
