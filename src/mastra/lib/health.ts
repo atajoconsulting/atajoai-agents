@@ -1,14 +1,16 @@
-/**
- * Startup health checks.
- *
- * Called once after the Mastra instance is created to verify that all external
- * dependencies are reachable before the server starts accepting production traffic.
- * Failures are logged but never throw — the server still starts so that the
- * /health endpoint (or Mastra's built-in diagnostics) can surface the issue.
- */
 import { env } from "../env";
+import { prisma } from "./db/prisma";
+import { redis } from "./db/redis";
 
 type Logger = { info: (msg: string) => void; warn: (msg: string) => void };
+export type HealthStatus = "ok" | "error" | "skipped";
+
+export interface ServiceHealth {
+  name: string;
+  status: HealthStatus;
+  latencyMs: number | null;
+  message?: string;
+}
 
 /** Verify Qdrant is reachable via its healthz endpoint. */
 async function checkQdrant(logger: Logger): Promise<void> {
@@ -20,33 +22,10 @@ async function checkQdrant(logger: Logger): Promise<void> {
   logger.info(`[health] Qdrant OK (${url})`);
 }
 
-/** Verify PostgreSQL is reachable via a TCP connection to the configured host/port. */
+/** Verify PostgreSQL is reachable through Prisma. */
 async function checkPostgres(logger: Logger): Promise<void> {
-  const { createConnection } = await import("node:net");
-  const url = new URL(env.DATABASE_URL);
-  const host = url.hostname;
-  const port = url.port ? parseInt(url.port, 10) : 5432;
-
-  await new Promise<void>((resolve, reject) => {
-    const socket = createConnection({ host, port });
-    const timer = setTimeout(() => {
-      socket.destroy();
-      reject(new Error(`TCP connect to ${host}:${port} timed out`));
-    }, 5_000);
-
-    socket.once("connect", () => {
-      clearTimeout(timer);
-      socket.destroy();
-      resolve();
-    });
-
-    socket.once("error", (err) => {
-      clearTimeout(timer);
-      reject(err);
-    });
-  });
-
-  logger.info(`[health] PostgreSQL OK (${host}:${port})`);
+  await prisma.$queryRawUnsafe("SELECT 1");
+  logger.info("[health] PostgreSQL OK");
 }
 
 /** Verify Mistral API key is valid by listing models (lightweight call). */
@@ -65,26 +44,63 @@ async function checkMistral(logger: Logger): Promise<void> {
   logger.info(`[health] Mistral API OK`);
 }
 
+async function measureHealthCheck(
+  name: string,
+  fn: (logger: Logger) => Promise<void>,
+  logger: Logger,
+): Promise<ServiceHealth> {
+  const startedAt = Date.now();
+
+  try {
+    await fn(logger);
+    return {
+      name,
+      status: "ok",
+      latencyMs: Date.now() - startedAt,
+    };
+  } catch (error) {
+    return {
+      name,
+      status: "error",
+      latencyMs: Date.now() - startedAt,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/** Verify Redis is reachable via PING. */
+async function checkRedis(logger: Logger): Promise<void> {
+  const result = await redis.ping();
+  if (result !== "PONG") {
+    throw new Error(`Redis PING returned unexpected response: ${result}`);
+  }
+  logger.info("[health] Redis OK");
+}
+
+export async function getSystemHealth(logger: Logger): Promise<ServiceHealth[]> {
+  return Promise.all([
+    measureHealthCheck("Qdrant", checkQdrant, logger),
+    measureHealthCheck("PostgreSQL", checkPostgres, logger),
+    measureHealthCheck("Redis", checkRedis, logger),
+    measureHealthCheck("Mistral", checkMistral, logger),
+  ]);
+}
+
 /**
  * Runs all startup checks concurrently.
  * Each failure is logged independently so a single bad dependency doesn't
  * mask others.
  */
 export async function runStartupChecks(logger: Logger): Promise<void> {
-  const checks: Array<{ name: string; fn: () => Promise<void> }> = [
-    { name: "Qdrant", fn: () => checkQdrant(logger) },
-    { name: "PostgreSQL", fn: () => checkPostgres(logger) },
-    { name: "Mistral", fn: () => checkMistral(logger) },
-  ];
+  const checks = await getSystemHealth(logger);
 
-  await Promise.all(
-    checks.map(async ({ name, fn }) => {
-      try {
-        await fn();
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        process.stderr.write(`[health] WARN: ${name} check failed: ${msg}\n`);
-      }
-    }),
-  );
+  for (const check of checks) {
+    if (check.status === "ok") {
+      continue;
+    }
+
+    process.stderr.write(
+      `[health] WARN: ${check.name} check failed: ${check.message ?? "unknown error"}\n`,
+    );
+  }
 }

@@ -11,9 +11,9 @@ import {
 } from "../lib/web-indexer";
 import type { CrawledPage } from "../lib/web-indexer";
 import { fetchPage } from "../lib/web-indexer/requester";
+import { getAppConfig } from "../lib/config";
 import { detectLang } from "../lib/language";
 import { toRagDocument, indexDocuments } from "../lib/rag";
-import { env } from "../env";
 
 const crawlPages = createStep({
   id: "crawl-pages",
@@ -86,7 +86,8 @@ const indexCrawledPages = createStep({
   execute: async ({ inputData, mastra }) => {
     const logger = mastra.getLogger();
     const vectorStore = mastra.getVector("qdrant");
-    const embedModel = new ModelRouterEmbeddingModel(env.EMBED_MODEL);
+    const config = await getAppConfig();
+    const embedModel = new ModelRouterEmbeddingModel(config.embedModel);
     const translator = mastra.getAgent("translatorAgent");
 
     const documents = inputData.crawledPages

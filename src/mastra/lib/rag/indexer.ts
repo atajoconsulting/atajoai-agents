@@ -56,6 +56,7 @@ export async function indexDocuments(
 
     try {
       // 1. Chunk the original content
+      logger.debug(`[indexer] Chunking document ${doc.source} (${doc.id})`);
       const chunks = await chunkText(doc.content, {
         documentId: doc.id,
         title: doc.title,
@@ -68,16 +69,22 @@ export async function indexDocuments(
         skipped++;
         continue;
       }
+      logger.debug(`[indexer] ${chunks.length} chunks produced for ${doc.source}`);
 
       // 2. Detect language — use pre-set lang from doc or detect from full content
       const lang = doc.lang ?? (await detectLang(doc.content)) ?? "es";
+      logger.debug(`[indexer] Language detected: ${lang} for ${doc.source}`);
 
       // 3. Translate each chunk to Spanish if needed
+      logger.debug(`[indexer] Translating ${chunks.length} chunks to Spanish for ${doc.source}`);
       const { texts: spanishTexts, fallbacks } = await translateChunks(chunks, lang, translator, logger);
       translationFallbacks += fallbacks;
+      logger.debug(`[indexer] Translation done for ${doc.source} (fallbacks=${fallbacks})`);
 
       // 4. Embed the Spanish versions
+      logger.debug(`[indexer] Embedding ${spanishTexts.length} chunks for ${doc.source}`);
       const { embeddings } = await embedModel.doEmbed({ values: spanishTexts });
+      logger.debug(`[indexer] Embedding done for ${doc.source}`);
 
       // 5. Build deterministic IDs and metadata, then upsert
       const ids = chunks.map((_, i) =>
@@ -97,6 +104,7 @@ export async function indexDocuments(
         indexedAt: (doc.indexedAt ?? new Date()).toISOString(),
       }));
 
+      logger.debug(`[indexer] Upserting ${ids.length} vectors to Qdrant for ${doc.source}`);
       await vectorStore.upsert({
         indexName: env.QDRANT_COLLECTION,
         vectors: embeddings,
@@ -109,9 +117,14 @@ export async function indexDocuments(
       );
       indexed++;
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
       logger.error(
-        `Failed indexing ${doc.source}: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed indexing ${doc.source}: ${message}`,
       );
+      if (stack) {
+        logger.debug(`[indexer] Stack trace for ${doc.source}: ${stack}`);
+      }
       errors++;
     }
   }

@@ -1,0 +1,80 @@
+datasource db {
+  provider = "postgresql"
+  schemas  = ["app"]
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+model AppConfig {
+  id                 String   @id @default("default")
+  orgName            String?
+  orgPhone           String?
+  orgSchedule        String?
+  orgAddress         String?
+  orgWebsite         String?
+  orgEOffice         String?
+  preferredLang      String?
+  responseStyle      String?
+  llmModel           String?
+  llmModelMedium     String?
+  llmModelSmall      String?
+  embedModel         String?
+  retrievalTopK      Int?
+  retrievalFinalK    Int?
+  customInstructions String?
+  greetingMessage    String?
+  outOfScopeMessage  String?
+  chatwootBaseUrl    String?
+  chatwootApiToken   String?
+  enableHandoff      Boolean?
+  handoffTeamId      String?
+  handoffAssigneeId  String?
+  updatedAt          DateTime @default(now()) @updatedAt
+
+  @@map("app_config")
+  @@schema("app")
+}
+
+enum DocumentStatus {
+  pending
+  indexing
+  indexed
+  error
+  deleting
+
+  @@schema("app")
+}
+
+enum SourceType {
+  web
+  pdf
+  docx
+  txt
+
+  @@schema("app")
+}
+
+model IndexedDocument {
+  id           String         @id @default(uuid()) @db.Uuid
+  source       String
+  sourceType   SourceType
+  title        String?
+  status       DocumentStatus @default(pending)
+  errorMessage String?
+  chunkCount   Int            @default(0)
+  contentHash  String?
+  s3Key        String?
+  autoReindex  Boolean        @default(false)
+  indexedAt    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @default(now()) @updatedAt
+
+  @@unique([source, sourceType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("indexed_documents")
+  @@schema("app")
+}

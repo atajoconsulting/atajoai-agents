@@ -1,5 +1,5 @@
 import { Agent } from "@mastra/core/agent";
-import { env } from "../env";
+import { getAppConfig } from "../lib/config";
 import { sharedMemory } from "./chatwoot-agent";
 
 export const answerabilityJudgeAgent = new Agent({
@@ -34,7 +34,7 @@ Reglas:
 - Si la evidencia contiene información de localidades o entidades distintas a la consultada, no la consideres como cobertura válida.
 - En caso de duda, marca answerable=false con un fallback conservador.
 `.trim(),
-  model: env.LLM_MODEL_SMALL,
+  model: async () => (await getAppConfig()).llmModelSmall,
   memory: sharedMemory,
   defaultOptions: {
     modelSettings: {

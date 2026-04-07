@@ -9,8 +9,8 @@ import {
 } from "../lib/document-extractor";
 import { fileToRagDocument, indexDocuments } from "../lib/rag";
 import type { RagDocument } from "../lib/rag";
+import { getAppConfig } from "../lib/config";
 import { detectLang } from "../lib/language";
-import { env } from "../env";
 
 export { documentIndexerInputSchema, documentIndexerOutputSchema };
 
@@ -103,7 +103,8 @@ const indexExtractedDocuments = createStep({
   execute: async ({ inputData, mastra }) => {
     const logger = mastra.getLogger();
     const vectorStore = mastra.getVector("qdrant");
-    const embedModel = new ModelRouterEmbeddingModel(env.EMBED_MODEL);
+    const config = await getAppConfig();
+    const embedModel = new ModelRouterEmbeddingModel(config.embedModel);
     const translator = mastra.getAgent("translatorAgent");
 
     const ragDocuments: RagDocument[] = inputData.documents.map((doc) =>

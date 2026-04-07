@@ -1,15 +1,11 @@
 import { registerApiRoute } from '@mastra/core/server';
 import { sendChatwootMessage } from '../lib/chatwoot-api';
-import { env } from '../env';
-
-/** Fallback message sent to the citizen when the workflow throws unexpectedly. */
-const WORKFLOW_ERROR_FALLBACK =
-  `Lo sentimos, ha ocurrido un error procesando tu mensaje. ` +
-  `Por favor, inténtalo de nuevo o contacta con nosotros en el ${env.MUNICIPALITY_PHONE}.`;
+import { getAppConfig } from '../lib/config';
 
 export const chatwootRoutes = [
   registerApiRoute('/chatwoot/webhook', {
     method: 'POST',
+    requiresAuth: false,
     openapi: {
       summary: 'Chatwoot Webhook',
       description: 'Receive and process Chatwoot webhook events',
@@ -62,17 +58,24 @@ export const chatwootRoutes = [
         logger.error('Workflow error', { error: msg });
 
         if (accountId !== undefined && conversationId !== undefined) {
-          sendChatwootMessage({
-            accountId,
-            conversationId,
-            content: WORKFLOW_ERROR_FALLBACK,
-          }).catch((sendErr: unknown) => {
-            const sendMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
-            process.stderr.write(
-              `[chatwoot-route] Failed to send fallback error message ` +
-              `(account=${accountId}, conversation=${conversationId}): ${sendMsg}\n`,
-            );
-          });
+          getAppConfig()
+            .then((config) =>
+              sendChatwootMessage({
+                accountId,
+                conversationId,
+                content:
+                  `Lo sentimos, ha ocurrido un error procesando tu mensaje. ` +
+                  `Por favor, inténtalo de nuevo o contacta con nosotros en el ${config.orgPhone}.`,
+              }),
+            )
+            .catch((sendErr: unknown) => {
+              const sendMsg =
+                sendErr instanceof Error ? sendErr.message : String(sendErr);
+              process.stderr.write(
+                `[chatwoot-route] Failed to send fallback error message ` +
+                `(account=${accountId}, conversation=${conversationId}): ${sendMsg}\n`,
+              );
+            });
         }
       });
 

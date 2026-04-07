@@ -1,5 +1,5 @@
 import { Agent } from "@mastra/core/agent";
-import { env } from "../env";
+import { getAppConfig } from "../lib/config";
 
 export const translatorAgent = new Agent({
   id: "translator-agent",
@@ -13,5 +13,5 @@ Rules:
 - If the text is already in Spanish, return it exactly as received.
 - Do not summarize or alter the meaning of the content.
   `.trim(),
-  model: env.LLM_MODEL_SMALL,
+  model: async () => (await getAppConfig()).llmModelSmall,
 });

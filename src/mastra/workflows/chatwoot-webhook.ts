@@ -5,6 +5,7 @@ import {
   assignChatwootConversation,
   sendChatwootMessage,
 } from "../lib/chatwoot-api";
+import { getAppConfig, hasHumanHandoffTarget } from "../lib/config";
 import {
   buildClarificationReply,
   buildGreetingReply,
@@ -23,12 +24,6 @@ import {
 import { env } from "../env";
 import { CHUNK_CONFIG } from "../lib/rag/chunker";
 import { sanitizeOutboundStepScorers } from "../scorers/local-info";
-
-const embedModel = new ModelRouterEmbeddingModel(env.EMBED_MODEL);
-
-// Retrieval tuning — adjust these to balance recall vs. context window usage
-const RETRIEVAL_TOP_K = 12;   // initial candidates fetched from Qdrant
-const RETRIEVAL_FINAL_K = 4;  // final evidence chunks passed to the LLM
 const MAX_EVIDENCE_CHARS = CHUNK_CONFIG.maxSize; // keep in sync with chunker
 
 export const chatwootWebhookSchema = z.object({
@@ -52,6 +47,7 @@ export const chatwootWebhookSchema = z.object({
   }).optional(),
   conversation: z.object({
     id: z.number(),
+    channel: z.string().optional(),
   }).optional(),
 });
 
@@ -63,6 +59,7 @@ const validationResultSchema = z.object({
   senderName: z.string(),
   threadId: z.string(),
   resourceId: z.string(),
+  channel: z.string(),
 });
 
 const routedResultSchema = validationResultSchema.extend({
@@ -91,6 +88,26 @@ const sanitizedResultSchema = judgedResultSchema.extend({
   sanitize: sanitizeReplyResultSchema,
 });
 
+const CHATWOOT_CHANNEL_MAP: Record<string, string> = {
+  "Channel::WebWidget": "web",
+  "Channel::FacebookPage": "facebook",
+  "Channel::TwitterProfile": "twitter",
+  "Channel::Whatsapp": "whatsapp",
+  "Channel::Api": "api",
+  "Channel::Email": "email",
+  "Channel::Sms": "sms",
+  "Channel::TwilioSms": "sms",
+  "Channel::Telegram": "telegram",
+  "Channel::Line": "line",
+  "Channel::Instagram": "instagram",
+  "Channel::Tiktok": "tiktok",
+};
+
+function normalizeChannel(raw?: string): string {
+  if (!raw) return "web";
+  return CHATWOOT_CHANNEL_MAP[raw] ?? "web";
+}
+
 function getDefaultRoute() {
   return {
     intent: "needs_clarification" as const,
@@ -110,11 +127,9 @@ function getDefaultJudgement() {
   };
 }
 
-function isHumanHandoffConfigured(): boolean {
-  return (
-    env.CHATWOOT_ENABLE_HUMAN_HANDOFF &&
-    Boolean(env.CHATWOOT_HANDOFF_ASSIGNEE_ID || env.CHATWOOT_HANDOFF_TEAM_ID)
-  );
+async function isHumanHandoffConfigured(): Promise<boolean> {
+  const config = await getAppConfig();
+  return config.enableHandoff && hasHumanHandoffTarget(config);
 }
 
 function formatEvidenceForPrompt(
@@ -190,13 +205,13 @@ function getJudgementForNonFactualRoute(
   };
 }
 
-function buildSafeFallbackReply(
+async function buildSafeFallbackReply(
   inputData: z.infer<typeof judgedResultSchema> & {
     handoffRequested?: boolean;
   },
-): string {
+): Promise<string> {
   if (inputData.handoffRequested) {
-    return isHumanHandoffConfigured()
+    return (await isHumanHandoffConfigured())
       ? buildHandoffConfirmationReply()
       : buildUnavailableHandoffReply(inputData.messageContent);
   }
@@ -233,12 +248,14 @@ async function retrieveLocalEvidence({
     process.stderr.write("[chatwoot-webhook] Qdrant vector store not registered — returning empty evidence\n");
     return [];
   }
+  const config = await getAppConfig();
+  const embedModel = new ModelRouterEmbeddingModel(config.embedModel);
   const { embeddings } = await embedModel.doEmbed({ values: [queryText] });
   const [queryVector] = embeddings;
   const results = await vectorStore.query({
     indexName: env.QDRANT_COLLECTION,
     queryVector,
-    topK: RETRIEVAL_TOP_K,
+    topK: config.retrievalTopK,
   });
 
   const deduped = new Map<string, z.infer<typeof localEvidenceSchema>>();
@@ -285,7 +302,7 @@ async function retrieveLocalEvidence({
 
   return Array.from(deduped.values())
     .sort((a, b) => b.score - a.score)
-    .slice(0, RETRIEVAL_FINAL_K);
+    .slice(0, config.retrievalFinalK);
 }
 
 const validateWebhook = createStep({
@@ -296,6 +313,8 @@ const validateWebhook = createStep({
   outputSchema: validationResultSchema,
   execute: async ({ inputData, abort }) => {
 
+    const channel = normalizeChannel(inputData.conversation?.channel);
+
     const skip = {
       shouldProcess: false,
       accountId: 0,
@@ -304,6 +323,7 @@ const validateWebhook = createStep({
       senderName: "",
       threadId: "",
       resourceId: "",
+      channel,
     }
 
     if (
@@ -326,6 +346,7 @@ const validateWebhook = createStep({
       senderName: inputData.sender?.name || "Ciudadano",
       threadId: `chatwoot-conv-${inputData.conversation.id}`,
       resourceId: `chatwoot-${inputData.conversation.id}`,
+      channel,
     };
   },
 });
@@ -506,11 +527,12 @@ const composeCitizenReply = createStep({
       inputData.route.requestedHandoff;
 
     if (handoffRequested) {
+      const handoffConfigured = await isHumanHandoffConfigured();
       return {
         ...inputData,
-        draftReply: isHumanHandoffConfigured()
-          ? buildHandoffConfirmationReply()
-          : buildUnavailableHandoffReply(inputData.messageContent),
+        draftReply: handoffConfigured
+          ? await buildHandoffConfirmationReply()
+          : await buildUnavailableHandoffReply(inputData.messageContent),
         shouldSend: true,
         handoffRequested,
       };
@@ -519,7 +541,7 @@ const composeCitizenReply = createStep({
     if (inputData.route.intent === "smalltalk_or_greeting") {
       return {
         ...inputData,
-        draftReply: buildGreetingReply(),
+        draftReply: await buildGreetingReply(),
         shouldSend: true,
         handoffRequested: false,
       };
@@ -528,7 +550,7 @@ const composeCitizenReply = createStep({
     if (inputData.route.intent === "out_of_scope") {
       return {
         ...inputData,
-        draftReply: buildOutOfScopeReply(),
+        draftReply: await buildOutOfScopeReply(),
         shouldSend: true,
         handoffRequested: false,
       };
@@ -540,7 +562,7 @@ const composeCitizenReply = createStep({
     ) {
       return {
         ...inputData,
-        draftReply: buildSensitiveReply(),
+        draftReply: await buildSensitiveReply(),
         shouldSend: true,
         handoffRequested: false,
       };
@@ -553,7 +575,7 @@ const composeCitizenReply = createStep({
     ) {
       return {
         ...inputData,
-        draftReply: buildClarificationReply(inputData.judgement.missingInfo),
+        draftReply: await buildClarificationReply(inputData.judgement.missingInfo),
         shouldSend: true,
         handoffRequested: false,
       };
@@ -562,7 +584,7 @@ const composeCitizenReply = createStep({
     if (!inputData.judgement.answerable || inputData.evidence.length === 0) {
       return {
         ...inputData,
-        draftReply: buildKnowledgeFallback(
+        draftReply: await buildKnowledgeFallback(
           inputData.judgement.fallbackMode,
           inputData.messageContent,
         ),
@@ -582,6 +604,7 @@ const composeCitizenReply = createStep({
           role: "user",
           content: [
             `Consulta del ciudadano: ${inputData.messageContent}`,
+            `Canal: ${inputData.channel}`,
             `<evidencia>\n${formatEvidenceForPrompt(inputData.evidence)}\n</evidencia>`,
             `Confianza en la evidencia: ${inputData.judgement.confidence}`,
           ].join("\n\n"),
@@ -651,6 +674,7 @@ const sanitizeReply = createStep({
           content: [
             `Reescriba este borrador. Problema detectado: ${initialCheck.reason}`,
             `Consulta original: ${inputData.messageContent}`,
+            `Canal: ${inputData.channel}`,
             `<evidencia>\n${formatEvidenceForPrompt(inputData.evidence)}\n</evidencia>`,
             `Borrador a reparar:\n${inputData.draftReply}`,
             "Devuelva solo el texto final corregido.",
@@ -675,7 +699,7 @@ const sanitizeReply = createStep({
       };
     }
 
-    const fallbackReply = buildSafeFallbackReply(inputData);
+    const fallbackReply = await buildSafeFallbackReply(inputData);
     const fallbackCheck = evaluateOutboundReply(fallbackReply);
 
     return {
@@ -708,13 +732,17 @@ const sendReply = createStep({
     let handoffPerformed = false;
 
     if (inputData.handoffRequested) {
-      if (isHumanHandoffConfigured()) {
+      const config = await getAppConfig();
+      const handoffConfigured =
+        config.enableHandoff && hasHumanHandoffTarget(config);
+
+      if (handoffConfigured) {
         try {
           await assignChatwootConversation({
             accountId: inputData.accountId,
             conversationId: inputData.conversationId,
-            assigneeId: env.CHATWOOT_HANDOFF_ASSIGNEE_ID,
-            teamId: env.CHATWOOT_HANDOFF_TEAM_ID,
+            assigneeId: config.handoffAssigneeId ?? undefined,
+            teamId: config.handoffTeamId ?? undefined,
           });
 
           handoffPerformed = true;
@@ -722,7 +750,7 @@ const sendReply = createStep({
           await sendChatwootMessage({
             accountId: inputData.accountId,
             conversationId: inputData.conversationId,
-            content: buildHandoffPrivateNote(
+            content: await buildHandoffPrivateNote(
               inputData.senderName,
               inputData.messageContent,
             ),
@@ -736,10 +764,10 @@ const sendReply = createStep({
             }`,
           );
 
-          outboundReply = buildUnavailableHandoffReply(inputData.messageContent);
+          outboundReply = await buildUnavailableHandoffReply(inputData.messageContent);
         }
       } else {
-        outboundReply = buildUnavailableHandoffReply(inputData.messageContent);
+        outboundReply = await buildUnavailableHandoffReply(inputData.messageContent);
       }
     }
 

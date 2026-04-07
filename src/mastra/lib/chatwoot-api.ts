@@ -1,4 +1,4 @@
-import { env } from "../env";
+import { getAppConfig } from "./config";
 
 export interface SendMessageParams {
   accountId: number;
@@ -34,13 +34,21 @@ async function chatwootRequest<T>(
   path: string,
   options: RequestInit,
 ): Promise<T> {
-  const url = `${env.CHATWOOT_BASE_URL}${path}`;
+  const config = await getAppConfig();
+  if (!config.chatwootBaseUrl || !config.chatwootApiToken) {
+    throw new Error(
+      "Chatwoot API is not configured. Set chatwootBaseUrl and chatwootApiToken in app config or env",
+    );
+  }
+
+  const baseUrl = config.chatwootBaseUrl.replace(/\/$/, "");
+  const url = `${baseUrl}${path}`;
 
   const response = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      api_access_token: env.CHATWOOT_API_TOKEN,
+      api_access_token: config.chatwootApiToken,
       ...(options.headers ?? {}),
     },
   });

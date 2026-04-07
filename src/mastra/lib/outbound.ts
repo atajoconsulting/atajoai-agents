@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { env } from "../env";
+import { getAppConfig } from "./config";
 
 export const localIntentSchema = z.enum([
   "local_factual",
@@ -203,15 +204,22 @@ export function evaluateOutboundReply(text: string): SanitizeReplyResult {
   };
 }
 
-export function buildOutOfScopeReply(): string {
-  return `Disculpe, solo puedo ayudarle con información factual del ${env.MUNICIPALITY_NAME} y de la vida local del municipio. Si lo desea, puedo orientarle sobre servicios, instalaciones, eventos o recursos locales.`;
+export async function buildOutOfScopeReply(): Promise<string> {
+  const config = await getAppConfig();
+  return (
+    config.outOfScopeMessage ??
+    `Disculpe, solo puedo ayudarle con información factual del ${config.orgName} y de la vida local del municipio. Si lo desea, puedo orientarle sobre servicios, instalaciones, eventos o recursos locales.`
+  );
 }
 
-export function buildSensitiveReply(): string {
-  return `Para este asunto, debe contactar directamente con el ${env.MUNICIPALITY_NAME} en el ${env.MUNICIPALITY_PHONE} (${env.MUNICIPALITY_SCHEDULE}).`;
+export async function buildSensitiveReply(): Promise<string> {
+  const config = await getAppConfig();
+  return `Para este asunto, debe contactar directamente con el ${config.orgName} en el ${config.orgPhone} (${config.orgSchedule}).`;
 }
 
-export function buildClarificationReply(missingInfo: string[]): string {
+export async function buildClarificationReply(
+  missingInfo: string[],
+): Promise<string> {
   const hints = missingInfo.slice(0, 2);
   const detail =
     hints.length > 0
@@ -221,17 +229,18 @@ export function buildClarificationReply(missingInfo: string[]): string {
   return `Necesito un poco más de información para ayudarle.${detail}`;
 }
 
-export function buildKnowledgeFallback(
+export async function buildKnowledgeFallback(
   mode: AnswerabilityFallback,
   originalQuestion: string,
-): string {
+): Promise<string> {
+  const config = await getAppConfig();
   switch (mode) {
     case "clarify":
       return buildClarificationReply([]);
     case "contact_web":
-      return `No he podido confirmarlo con suficiente fiabilidad. Puede consultar la web municipal ${env.MUNICIPALITY_WEBSITE} o la sede electrónica ${env.MUNICIPALITY_ELECTRONIC_OFFICE_URL}.`;
+      return `No he podido confirmarlo con suficiente fiabilidad. Puede consultar la web municipal ${config.orgWebsite} o la sede electrónica ${config.orgEOffice}.`;
     case "contact_office":
-      return `No he podido confirmarlo con suficiente fiabilidad. Le recomiendo acudir al ${env.MUNICIPALITY_NAME} en ${env.MUNICIPALITY_ADDRESS} o llamar al ${env.MUNICIPALITY_PHONE}.`;
+      return `No he podido confirmarlo con suficiente fiabilidad. Le recomiendo acudir al ${config.orgName} en ${config.orgAddress} o llamar al ${config.orgPhone}.`;
     case "safe_refusal":
       return buildSensitiveReply();
     case "handoff":
@@ -239,39 +248,46 @@ export function buildKnowledgeFallback(
     case "contact_phone":
     case "none":
     default:
-      return `Lo siento, no dispongo de información suficientemente fiable para responder a esa consulta. Le recomiendo contactar con el ${env.MUNICIPALITY_NAME} en el ${env.MUNICIPALITY_PHONE} (${env.MUNICIPALITY_SCHEDULE}) o consultar ${env.MUNICIPALITY_WEBSITE}.`;
+      return `Lo siento, no dispongo de información suficientemente fiable para responder a esa consulta. Le recomiendo contactar con el ${config.orgName} en el ${config.orgPhone} (${config.orgSchedule}) o consultar ${config.orgWebsite}.`;
   }
 }
 
-export function buildUnavailableHandoffReply(originalQuestion: string): string {
+export async function buildUnavailableHandoffReply(
+  originalQuestion: string,
+): Promise<string> {
+  const config = await getAppConfig();
   const suffix = originalQuestion.trim()
     ? "Si lo desea, también puede escribir aquí su consulta concreta e intentaré orientarle con la información local disponible."
     : "Puede escribir aquí su consulta y trataré de orientarle con la información local disponible.";
 
   return [
     "Ahora mismo este canal no permite derivarle directamente a una persona.",
-    `Puede contactar con el ${env.MUNICIPALITY_NAME} en el ${env.MUNICIPALITY_PHONE} (${env.MUNICIPALITY_SCHEDULE}) o consultar ${env.MUNICIPALITY_WEBSITE}.`,
+    `Puede contactar con el ${config.orgName} en el ${config.orgPhone} (${config.orgSchedule}) o consultar ${config.orgWebsite}.`,
     suffix,
   ].join(" ");
 }
 
-export function buildHandoffConfirmationReply(): string {
+export async function buildHandoffConfirmationReply(): Promise<string> {
   return "He trasladado su conversación al equipo de atención municipal. En cuanto sea posible, una persona continuará la atención por este mismo canal.";
 }
 
-export function buildGreetingReply(): string {
-  return [
-    `Hola, soy el asistente virtual de información local del ${env.MUNICIPALITY_NAME}.`,
-    "Puedo ayudarle con trámites, servicios, instalaciones, eventos y recursos del municipio.",
-    "La información proporcionada está sujeta a posibles cambios o incidencias de última hora.",
-    "¿En qué puedo ayudarle?",
-  ].join(" ");
+export async function buildGreetingReply(): Promise<string> {
+  const config = await getAppConfig();
+  return (
+    config.greetingMessage ??
+    [
+      `Hola, soy el asistente virtual de información local del ${config.orgName}.`,
+      "Puedo ayudarle con trámites, servicios, instalaciones, eventos y recursos del municipio.",
+      "La información proporcionada está sujeta a posibles cambios o incidencias de última hora.",
+      "¿En qué puedo ayudarle?",
+    ].join(" ")
+  );
 }
 
-export function buildHandoffPrivateNote(
+export async function buildHandoffPrivateNote(
   senderName: string,
   messageContent: string,
-): string {
+): Promise<string> {
   return [
     "[handoff solicitado por bot]",
     `Remitente: ${senderName || "Ciudadano"}`,

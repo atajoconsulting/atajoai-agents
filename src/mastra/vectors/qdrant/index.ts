@@ -7,6 +7,13 @@ export const qdrantVector = new QdrantVector({
   ...(env.QDRANT_API_KEY && { apiKey: env.QDRANT_API_KEY }),
 });
 
+type QdrantClientFromVector = (typeof qdrantVector extends { client: infer C } ? C : never);
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getQdrantClient(): any {
+  return (qdrantVector as any).client;
+}
+
 async function ensureQdrantSetup(): Promise<void> {
   await qdrantVector.createIndex({
     indexName: env.QDRANT_COLLECTION,
