@@ -4,9 +4,12 @@ import type { Prisma } from "../../generated/prisma/client";
 import {
   DEFAULT_APP_CONFIG_ID,
   getAppConfig,
+  getChatwootApiToken,
   invalidateAppConfigCache,
+  invalidateChatwootApiTokenCache,
   serializeAppConfig,
 } from "../lib/config";
+import { encryptToken } from "../lib/crypto";
 import { prisma } from "../lib/db/prisma";
 
 const nullableTrimmedString = z.string().trim().min(1).nullable().optional();
@@ -74,8 +77,7 @@ const serializedConfigSchema = z.object({
   greetingMessage: z.string().nullable(),
   outOfScopeMessage: z.string().nullable(),
   chatwootBaseUrl: z.string().nullable(),
-  chatwootApiTokenMasked: z.string().nullable(),
-  hasChatwootApiToken: z.boolean(),
+  chatwootApiToken: z.string().nullable(),
   enableHandoff: z.boolean(),
   handoffTeamId: z.number().int().positive().nullable(),
   handoffAssigneeId: z.number().int().positive().nullable(),
@@ -112,9 +114,12 @@ export const chatwootConfigRoutes = [
     },
     handler: async (c) => {
       const logger = c.get("mastra").getLogger();
-      const config = await getAppConfig();
+      const [config, apiToken] = await Promise.all([getAppConfig(), getChatwootApiToken()]);
       logger.debug("Config fetched");
-      return c.json(serializeAppConfig(config), 200);
+      return c.json({
+        ...serializeAppConfig(config),
+        chatwootApiToken: apiToken ? "******" : null,
+      }, 200);
     },
   }),
   registerApiRoute("/chatwoot/config", {
@@ -179,7 +184,11 @@ export const chatwootConfigRoutes = [
       };
 
       for (const key of Object.keys(parsed.data) as Array<keyof typeof parsed.data>) {
-        assign(key as Exclude<keyof Prisma.AppConfigUncheckedCreateInput, "id">, parsed.data[key]);
+        const value = parsed.data[key];
+        const stored = key === "chatwootApiToken" && typeof value === "string"
+          ? encryptToken(value)
+          : value;
+        assign(key as Exclude<keyof Prisma.AppConfigUncheckedCreateInput, "id">, stored);
       }
 
       await prisma.appConfig.upsert({
@@ -188,11 +197,21 @@ export const chatwootConfigRoutes = [
         update: updateData,
       });
 
-      await invalidateAppConfigCache();
-      const updatedConfig = await getAppConfig({ forceRefresh: true });
+      const hasTokenChange = "chatwootApiToken" in parsed.data;
+      await Promise.all([
+        invalidateAppConfigCache(),
+        hasTokenChange ? invalidateChatwootApiTokenCache() : Promise.resolve(),
+      ]);
+      const [updatedConfig, updatedToken] = await Promise.all([
+        getAppConfig({ forceRefresh: true }),
+        getChatwootApiToken(),
+      ]);
       const changedKeys = Object.keys(parsed.data);
       logger.debug(`Config updated: ${changedKeys.join(", ")}`);
-      return c.json(serializeAppConfig(updatedConfig), 200);
+      return c.json({
+        ...serializeAppConfig(updatedConfig),
+        chatwootApiToken: updatedToken ? "******" : null,
+      }, 200);
     },
   }),
 ];

@@ -6,7 +6,7 @@ import {
   createFaithfulnessScorer,
   createTrajectoryScorerCode,
 } from "@mastra/evals/scorers/prebuilt";
-import { env } from "../env";
+import { DEFAULT_CONFIG } from "../lib/default-config";
 import {
   evaluateOutboundReply,
   isSubjectiveLocalQuery,
@@ -72,7 +72,7 @@ function getEvidence(run: { input?: any; output?: any }): string[] {
 }
 
 const answerRelevancyJudge = createAnswerRelevancyScorer({
-  model: env.LLM_MODEL_SMALL,
+  model: DEFAULT_CONFIG.llmModelSmall,
 });
 
 export const localChannelRuleScorer = createScorer({
@@ -179,7 +179,7 @@ export const localInfoFaithfulnessScorer = createScorer({
 
   const syntheticRun = createSyntheticAgentRun(question, reply);
   const scorer = createFaithfulnessScorer({
-    model: env.LLM_MODEL_SMALL,
+    model: DEFAULT_CONFIG.llmModelSmall,
     options: { context: evidence },
   });
 
@@ -201,7 +201,7 @@ export const localInfoFaithfulnessScorer = createScorer({
 
   const syntheticRun = createSyntheticAgentRun(question, reply);
   const scorer = createFaithfulnessScorer({
-    model: env.LLM_MODEL_SMALL,
+    model: DEFAULT_CONFIG.llmModelSmall,
     options: { context: evidence },
   });
 
@@ -229,7 +229,7 @@ export const localInfoContextPrecisionScorer = createScorer({
 
   const syntheticRun = createSyntheticAgentRun(question, reply);
   const scorer = createContextPrecisionScorer({
-    model: env.LLM_MODEL_SMALL,
+    model: DEFAULT_CONFIG.llmModelSmall,
     options: { context: evidence },
   });
 
@@ -251,7 +251,7 @@ export const localInfoContextPrecisionScorer = createScorer({
 
   const syntheticRun = createSyntheticAgentRun(question, reply);
   const scorer = createContextPrecisionScorer({
-    model: env.LLM_MODEL_SMALL,
+    model: DEFAULT_CONFIG.llmModelSmall,
     options: { context: evidence },
   });
 

@@ -1,12 +1,14 @@
-import { env } from "../env";
 import type { AppConfig } from "../../generated/prisma/client";
 import { prisma } from "./db/prisma";
 import { redis } from "./db/redis";
+import { DEFAULT_CONFIG } from "./default-config";
+import { decryptToken, encryptToken } from "./crypto";
+import { env } from "../env";
 
 export const DEFAULT_APP_CONFIG_ID = "default";
 
 const REDIS_KEY = "app:config:default";
-const REDIS_TTL_SECONDS = 60;
+const REDIS_TOKEN_KEY = "app:token:chatwoot";
 
 export interface ResolvedAppConfig {
   id: string;
@@ -24,11 +26,11 @@ export interface ResolvedAppConfig {
   embedModel: string;
   retrievalTopK: number;
   retrievalFinalK: number;
+  retrievalMinScore: number;
   customInstructions: string | null;
-  greetingMessage: string | null;
-  outOfScopeMessage: string | null;
+  greetingMessage: string;
+  outOfScopeMessage: string;
   chatwootBaseUrl: string | null;
-  chatwootApiToken: string | null;
   enableHandoff: boolean;
   handoffTeamId: number | null;
   handoffAssigneeId: number | null;
@@ -60,44 +62,39 @@ function trimOrNull(value: string | null | undefined): string | null {
 function resolveConfig(record: AppConfig | null): ResolvedAppConfig {
   return {
     id: record?.id ?? DEFAULT_APP_CONFIG_ID,
-    orgName: trimOrNull(record?.orgName) ?? env.MUNICIPALITY_NAME,
-    orgPhone: trimOrNull(record?.orgPhone) ?? env.MUNICIPALITY_PHONE,
-    orgSchedule: trimOrNull(record?.orgSchedule) ?? env.MUNICIPALITY_SCHEDULE,
-    orgAddress: trimOrNull(record?.orgAddress) ?? env.MUNICIPALITY_ADDRESS,
-    orgWebsite: trimOrNull(record?.orgWebsite) ?? env.MUNICIPALITY_WEBSITE,
+    orgName: trimOrNull(record?.orgName) ?? DEFAULT_CONFIG.orgName,
+    orgPhone: trimOrNull(record?.orgPhone) ?? DEFAULT_CONFIG.orgPhone,
+    orgSchedule: trimOrNull(record?.orgSchedule) ?? DEFAULT_CONFIG.orgSchedule,
+    orgAddress: trimOrNull(record?.orgAddress) ?? DEFAULT_CONFIG.orgAddress,
+    orgWebsite: trimOrNull(record?.orgWebsite) ?? DEFAULT_CONFIG.orgWebsite,
     orgEOffice:
-      trimOrNull(record?.orgEOffice) ?? env.MUNICIPALITY_ELECTRONIC_OFFICE_URL,
+      trimOrNull(record?.orgEOffice) ?? DEFAULT_CONFIG.orgEOffice,
     preferredLang:
-      trimOrNull(record?.preferredLang) ?? env.MUNICIPALITY_PREFERRED_LANGUAGE,
+      trimOrNull(record?.preferredLang) ?? DEFAULT_CONFIG.preferredLang,
     responseStyle:
       record?.responseStyle === "brief_plain" ||
       record?.responseStyle === "brief_structured"
         ? record.responseStyle
-        : env.OUTBOUND_RESPONSE_STYLE,
-    llmModel: trimOrNull(record?.llmModel) ?? env.LLM_MODEL,
-    llmModelMedium: trimOrNull(record?.llmModelMedium) ?? env.LLM_MODEL_MEDIUM,
-    llmModelSmall: trimOrNull(record?.llmModelSmall) ?? env.LLM_MODEL_SMALL,
-    embedModel: trimOrNull(record?.embedModel) ?? env.EMBED_MODEL,
-    retrievalTopK: record?.retrievalTopK ?? 12,
-    retrievalFinalK: record?.retrievalFinalK ?? 4,
+        : DEFAULT_CONFIG.responseStyle,
+    llmModel: trimOrNull(record?.llmModel) ?? DEFAULT_CONFIG.llmModel,
+    llmModelMedium: trimOrNull(record?.llmModelMedium) ?? DEFAULT_CONFIG.llmModelMedium,
+    llmModelSmall: trimOrNull(record?.llmModelSmall) ?? DEFAULT_CONFIG.llmModelSmall,
+    embedModel: trimOrNull(record?.embedModel) ?? DEFAULT_CONFIG.embedModel,
+    retrievalTopK: record?.retrievalTopK ?? DEFAULT_CONFIG.retrievalTopK,
+    retrievalFinalK: record?.retrievalFinalK ?? DEFAULT_CONFIG.retrievalFinalK,
+    retrievalMinScore: DEFAULT_CONFIG.retrievalMinScore,
     customInstructions: trimOrNull(record?.customInstructions),
-    greetingMessage: trimOrNull(record?.greetingMessage),
-    outOfScopeMessage: trimOrNull(record?.outOfScopeMessage),
-    chatwootBaseUrl: trimOrNull(record?.chatwootBaseUrl) ?? env.CHATWOOT_BASE_URL ?? null,
-    chatwootApiToken:
-      trimOrNull(record?.chatwootApiToken) ?? env.CHATWOOT_API_TOKEN ?? null,
-    enableHandoff: record?.enableHandoff ?? env.CHATWOOT_ENABLE_HUMAN_HANDOFF,
-    handoffTeamId:
-      parseOptionalInteger(record?.handoffTeamId) ?? env.CHATWOOT_HANDOFF_TEAM_ID ?? null,
-    handoffAssigneeId:
-      parseOptionalInteger(record?.handoffAssigneeId) ??
-      env.CHATWOOT_HANDOFF_ASSIGNEE_ID ??
-      null,
+    greetingMessage: trimOrNull(record?.greetingMessage) ?? DEFAULT_CONFIG.greetingMessage,
+    outOfScopeMessage: trimOrNull(record?.outOfScopeMessage) ?? DEFAULT_CONFIG.outOfScopeMessage,
+    chatwootBaseUrl: trimOrNull(record?.chatwootBaseUrl) ?? DEFAULT_CONFIG.chatwootBaseUrl,
+    enableHandoff: record?.enableHandoff ?? DEFAULT_CONFIG.enableHandoff,
+    handoffTeamId: parseOptionalInteger(record?.handoffTeamId) ?? DEFAULT_CONFIG.handoffTeamId,
+    handoffAssigneeId: parseOptionalInteger(record?.handoffAssigneeId) ?? DEFAULT_CONFIG.handoffAssigneeId,
     updatedAt: record?.updatedAt ?? new Date(0),
   };
 }
 
-function maskSecret(value: string | null): string | null {
+export function maskSecret(value: string | null): string | null {
   if (!value) {
     return null;
   }
@@ -130,7 +127,7 @@ async function fetchAndCache(): Promise<ResolvedAppConfig> {
   const config = resolveConfig(record);
 
   try {
-    await redis.set(REDIS_KEY, JSON.stringify(config), "EX", REDIS_TTL_SECONDS);
+    await redis.set(REDIS_KEY, JSON.stringify(config));
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     process.stderr.write(`[config] Redis SET failed, config uncached: ${msg}\n`);
@@ -192,12 +189,11 @@ export function serializeAppConfig(config: ResolvedAppConfig) {
     embedModel: config.embedModel,
     retrievalTopK: config.retrievalTopK,
     retrievalFinalK: config.retrievalFinalK,
+    retrievalMinScore: config.retrievalMinScore,
     customInstructions: config.customInstructions,
     greetingMessage: config.greetingMessage,
     outOfScopeMessage: config.outOfScopeMessage,
     chatwootBaseUrl: config.chatwootBaseUrl,
-    chatwootApiTokenMasked: maskSecret(config.chatwootApiToken),
-    hasChatwootApiToken: Boolean(config.chatwootApiToken),
     enableHandoff: config.enableHandoff,
     handoffTeamId: config.handoffTeamId,
     handoffAssigneeId: config.handoffAssigneeId,
@@ -207,4 +203,43 @@ export function serializeAppConfig(config: ResolvedAppConfig) {
 
 export function hasHumanHandoffTarget(config: ResolvedAppConfig): boolean {
   return Boolean(config.handoffAssigneeId || config.handoffTeamId);
+}
+
+export async function getChatwootApiToken(): Promise<string | null> {
+  try {
+    const cached = await redis.get(REDIS_TOKEN_KEY);
+    if (cached) {
+      return decryptToken(cached);
+    }
+  } catch {}
+
+  let token: string | null = null;
+  try {
+    const record = await prisma.appConfig.findUnique({
+      where: { id: DEFAULT_APP_CONFIG_ID },
+      select: { chatwootApiToken: true },
+    });
+    if (record?.chatwootApiToken) {
+      token = decryptToken(record.chatwootApiToken);
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`[config] Failed to read chatwootApiToken from DB: ${msg}\n`);
+  }
+
+  token ??= env.CHATWOOT_API_TOKEN ?? null;
+
+  if (token) {
+    try {
+      await redis.set(REDIS_TOKEN_KEY, encryptToken(token));
+    } catch {}
+  }
+
+  return token;
+}
+
+export async function invalidateChatwootApiTokenCache(): Promise<void> {
+  try {
+    await redis.del(REDIS_TOKEN_KEY);
+  } catch {}
 }

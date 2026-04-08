@@ -5,15 +5,18 @@ import {
   assignChatwootConversation,
   sendChatwootMessage,
 } from "../lib/chatwoot-api";
-import { getAppConfig, hasHumanHandoffTarget } from "../lib/config";
+import {
+  getAppConfig,
+  hasHumanHandoffTarget,
+  type ResolvedAppConfig,
+} from "../lib/config";
 import {
   buildClarificationReply,
   buildGreetingReply,
   buildHandoffConfirmationReply,
   buildHandoffPrivateNote,
   buildKnowledgeFallback,
-  buildOutOfScopeReply,
-  buildSensitiveReply,
+  buildReplyForIntent,
   buildUnavailableHandoffReply,
   evaluateOutboundReply,
   judgeAnswerabilityResultSchema,
@@ -21,10 +24,18 @@ import {
   routeMessageResultSchema,
   sanitizeReplyResultSchema,
 } from "../lib/outbound";
+import { isMessageProcessed } from "../lib/dedup";
+import { performChatwootHandoff } from "../lib/handoff";
+import { isRateLimited } from "../lib/rate-limit";
+import { logStepMetrics, extractTokenUsage } from "../lib/metrics";
+import { buildEvidenceQuery } from "../lib/rag/retrieval";
 import { env } from "../env";
 import { CHUNK_CONFIG } from "../lib/rag/chunker";
 import { sanitizeOutboundStepScorers } from "../scorers/local-info";
-const MAX_EVIDENCE_CHARS = CHUNK_CONFIG.maxSize; // keep in sync with chunker
+
+const MAX_EVIDENCE_CHARS = CHUNK_CONFIG.maxSize;
+const MAX_INPUT_LENGTH = 2000;
+const LLM_TIMEOUT_MS = 30_000;
 
 export const chatwootWebhookSchema = z.object({
   event: z.string().describe("Webhook event type"),
@@ -51,6 +62,10 @@ export const chatwootWebhookSchema = z.object({
   }).optional(),
 });
 
+// ---------------------------------------------------------------------------
+// Pipeline context — each step extends with its own fields
+// ---------------------------------------------------------------------------
+
 const validationResultSchema = z.object({
   shouldProcess: z.boolean(),
   accountId: z.number(),
@@ -60,6 +75,7 @@ const validationResultSchema = z.object({
   threadId: z.string(),
   resourceId: z.string(),
   channel: z.string(),
+  config: z.any(), // ResolvedAppConfig threaded through the entire pipeline
 });
 
 const routedResultSchema = validationResultSchema.extend({
@@ -87,6 +103,10 @@ const sanitizedResultSchema = judgedResultSchema.extend({
   handoffRequested: z.boolean(),
   sanitize: sanitizeReplyResultSchema,
 });
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 const CHATWOOT_CHANNEL_MAP: Record<string, string> = {
   "Channel::WebWidget": "web",
@@ -127,11 +147,6 @@ function getDefaultJudgement() {
   };
 }
 
-async function isHumanHandoffConfigured(): Promise<boolean> {
-  const config = await getAppConfig();
-  return config.enableHandoff && hasHumanHandoffTarget(config);
-}
-
 function formatEvidenceForPrompt(
   evidence: z.infer<typeof localEvidenceSchema>[],
 ): string {
@@ -156,7 +171,6 @@ function formatEvidenceForPrompt(
     })
     .join("\n\n");
 }
-
 
 function getJudgementForNonFactualRoute(
   route: z.infer<typeof routeMessageResultSchema>,
@@ -205,58 +219,28 @@ function getJudgementForNonFactualRoute(
   };
 }
 
-async function buildSafeFallbackReply(
-  inputData: z.infer<typeof judgedResultSchema> & {
-    handoffRequested?: boolean;
-  },
-): Promise<string> {
-  if (inputData.handoffRequested) {
-    return (await isHumanHandoffConfigured())
-      ? buildHandoffConfirmationReply()
-      : buildUnavailableHandoffReply(inputData.messageContent);
-  }
-
-  switch (inputData.route.intent) {
-    case "smalltalk_or_greeting":
-      return buildGreetingReply();
-    case "out_of_scope":
-      return buildOutOfScopeReply();
-    case "sensitive":
-      return buildSensitiveReply();
-    case "needs_clarification":
-      return buildClarificationReply(inputData.judgement.missingInfo);
-    case "handoff_request":
-      return buildUnavailableHandoffReply(inputData.messageContent);
-    case "local_factual":
-    default:
-      return buildKnowledgeFallback(
-        inputData.judgement.fallbackMode,
-        inputData.messageContent,
-      );
-  }
-}
-
 async function retrieveLocalEvidence({
   mastra,
   queryText,
+  config,
 }: {
   mastra: any;
   queryText: string;
+  config: ResolvedAppConfig;
 }): Promise<z.infer<typeof localEvidenceSchema>[]> {
   const vectorStore = mastra.getVector("qdrant");
   if (!vectorStore) {
-    process.stderr.write("[chatwoot-webhook] Qdrant vector store not registered — returning empty evidence\n");
+    const logger = mastra.getLogger();
+    logger.warn("[chatwoot-webhook] Qdrant vector store not registered — returning empty evidence");
     return [];
   }
-  const config = await getAppConfig();
+
   const embedModel = new ModelRouterEmbeddingModel(config.embedModel);
   const { embeddings } = await embedModel.doEmbed({ values: [queryText] });
   const [queryVector] = embeddings;
-  const results = await vectorStore.query({
-    indexName: env.QDRANT_COLLECTION,
-    queryVector,
-    topK: config.retrievalTopK,
-  });
+  const results = await vectorStore.query(
+    buildEvidenceQuery(env.QDRANT_COLLECTION, queryVector, config),
+  );
 
   const deduped = new Map<string, z.infer<typeof localEvidenceSchema>>();
 
@@ -274,6 +258,11 @@ async function retrieveLocalEvidence({
     });
 
     if (!parsed.success || !parsed.data.content.trim()) {
+      continue;
+    }
+
+    // Score threshold filter (#9)
+    if (parsed.data.score < config.retrievalMinScore) {
       continue;
     }
 
@@ -305,14 +294,19 @@ async function retrieveLocalEvidence({
     .slice(0, config.retrievalFinalK);
 }
 
+// ---------------------------------------------------------------------------
+// STEP 1: Validate webhook + dedup + rate limiting + input length
+// ---------------------------------------------------------------------------
+
 const validateWebhook = createStep({
   id: "validate-webhook",
   description:
-    "Validates the incoming Chatwoot webhook and extracts relevant data",
+    "Validates the incoming Chatwoot webhook, deduplicates, rate-limits, and extracts relevant data",
   inputSchema: chatwootWebhookSchema,
   outputSchema: validationResultSchema,
-  execute: async ({ inputData, abort }) => {
-
+  execute: async ({ inputData, mastra, abort }) => {
+    const t0 = Date.now();
+    const logger = mastra?.getLogger();
     const channel = normalizeChannel(inputData.conversation?.channel);
 
     const skip = {
@@ -324,7 +318,8 @@ const validateWebhook = createStep({
       threadId: "",
       resourceId: "",
       channel,
-    }
+      config: {} as ResolvedAppConfig,
+    };
 
     if (
       inputData.event !== "message_created" ||
@@ -338,25 +333,66 @@ const validateWebhook = createStep({
       return skip;
     }
 
-    return {
+    // Dedup by message ID (#2)
+    if (inputData.id && (await isMessageProcessed(inputData.id))) {
+      logger?.debug(`[validate] Duplicate message ${inputData.id} — skipping`);
+      abort();
+      return skip;
+    }
+
+    // Rate limiting per conversation (#4)
+    if (
+      await isRateLimited(
+        inputData.conversation.id,
+        env.RATE_LIMIT_PER_CONVERSATION,
+        env.RATE_LIMIT_WINDOW_SECONDS,
+      )
+    ) {
+      logger?.warn(
+        `[validate] Rate limited conversation ${inputData.conversation.id}`,
+      );
+      abort();
+      return skip;
+    }
+
+    // Fetch config once for the entire pipeline (#15)
+    const config = await getAppConfig();
+
+    const result = {
       shouldProcess: true,
       accountId: inputData.account.id,
       conversationId: inputData.conversation.id,
-      messageContent: inputData.content.trim(),
+      messageContent: inputData.content.trim().slice(0, MAX_INPUT_LENGTH), // #3
       senderName: inputData.sender?.name || "Ciudadano",
       threadId: `chatwoot-conv-${inputData.conversation.id}`,
       resourceId: `chatwoot-${inputData.conversation.id}`,
       channel,
+      config,
     };
+
+    if (logger) {
+      logStepMetrics(logger, "validate-webhook", {
+        durationMs: Date.now() - t0,
+      });
+    }
+
+    return result;
   },
 });
 
+// ---------------------------------------------------------------------------
+// STEP 2: Route message (intent classification only)
+// ---------------------------------------------------------------------------
+
 const routeMessage = createStep({
   id: "route-message",
-  description: "Classifies the incoming message into a controlled intent",
+  description: "Classifies the incoming message and rewrites the search query if retrieval is needed",
   inputSchema: validationResultSchema,
   outputSchema: routedResultSchema,
   execute: async ({ inputData, mastra }) => {
+    const t0 = Date.now();
+    const logger = mastra?.getLogger();
+
     if (!inputData.shouldProcess) {
       return {
         ...inputData,
@@ -386,6 +422,7 @@ const routeMessage = createStep({
       {
         maxSteps: 1,
         memory: memoryOptions,
+        abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
         structuredOutput: {
           schema: routeMessageResultSchema,
         },
@@ -394,6 +431,7 @@ const routeMessage = createStep({
 
     const route = routeMessageResultSchema.parse(response.object);
 
+    // Rewrite the search query if retrieval is needed
     let searchQuery = inputData.messageContent;
     if (route.requiresRetrieval) {
       const rewriteResponse = await router.generate(
@@ -412,15 +450,28 @@ const routeMessage = createStep({
         {
           maxSteps: 1,
           memory: memoryOptions,
+          abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
           modelSettings: { temperature: 0, maxOutputTokens: 100 },
         },
       );
       searchQuery = rewriteResponse.text.trim() || inputData.messageContent;
     }
 
+    if (logger) {
+      logStepMetrics(logger, "route-message", {
+        durationMs: Date.now() - t0,
+        tokensUsed: extractTokenUsage(response),
+        extra: { intent: route.intent },
+      });
+    }
+
     return { ...inputData, route, searchQuery };
   },
 });
+
+// ---------------------------------------------------------------------------
+// STEP 3: Retrieve context from Qdrant (with score threshold — #9)
+// ---------------------------------------------------------------------------
 
 const retrieveContext = createStep({
   id: "retrieve-context",
@@ -428,6 +479,9 @@ const retrieveContext = createStep({
   inputSchema: routedResultSchema,
   outputSchema: retrievedResultSchema,
   execute: async ({ inputData, mastra }) => {
+    const t0 = Date.now();
+    const logger = mastra?.getLogger();
+
     if (!inputData.shouldProcess || !inputData.route.requiresRetrieval) {
       return { ...inputData, evidence: [] };
     }
@@ -435,14 +489,33 @@ const retrieveContext = createStep({
     const evidence = await retrieveLocalEvidence({
       mastra,
       queryText: inputData.searchQuery,
+      config: inputData.config,
     });
 
-    return {
-      ...inputData,
-      evidence,
-    };
+    if (logger) {
+      if (evidence.length === 0) {
+        logger.warn("[retrieve-context] No evidence matched current embedModel", {
+          conversationId: inputData.conversationId,
+          embedModel: inputData.config.embedModel,
+        });
+      }
+
+      logStepMetrics(logger, "retrieve-context", {
+        durationMs: Date.now() - t0,
+        extra: {
+          evidenceCount: evidence.length,
+          embedModel: inputData.config.embedModel,
+        },
+      });
+    }
+
+    return { ...inputData, evidence };
   },
 });
+
+// ---------------------------------------------------------------------------
+// STEP 5: Judge answerability
+// ---------------------------------------------------------------------------
 
 const judgeAnswerability = createStep({
   id: "judge-answerability",
@@ -451,6 +524,9 @@ const judgeAnswerability = createStep({
   inputSchema: retrievedResultSchema,
   outputSchema: judgedResultSchema,
   execute: async ({ inputData, mastra }) => {
+    const t0 = Date.now();
+    const logger = mastra?.getLogger();
+
     if (!inputData.shouldProcess) {
       return { ...inputData, judgement: getDefaultJudgement() };
     }
@@ -466,10 +542,7 @@ const judgeAnswerability = createStep({
     }
 
     if (inputData.evidence.length === 0) {
-      return {
-        ...inputData,
-        judgement: getDefaultJudgement(),
-      };
+      return { ...inputData, judgement: getDefaultJudgement() };
     }
 
     const judge = mastra?.getAgent("answerabilityJudgeAgent");
@@ -489,6 +562,7 @@ const judgeAnswerability = createStep({
       ],
       {
         maxSteps: 1,
+        abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
         memory: {
           thread: inputData.threadId,
           resource: inputData.resourceId,
@@ -500,12 +574,26 @@ const judgeAnswerability = createStep({
       },
     );
 
-    return {
-      ...inputData,
-      judgement: judgeAnswerabilityResultSchema.parse(response.object),
-    };
+    const judgement = judgeAnswerabilityResultSchema.parse(response.object);
+
+    if (logger) {
+      logStepMetrics(logger, "judge-answerability", {
+        durationMs: Date.now() - t0,
+        tokensUsed: extractTokenUsage(response),
+        extra: {
+          answerable: judgement.answerable,
+          confidence: judgement.confidence,
+        },
+      });
+    }
+
+    return { ...inputData, judgement };
   },
 });
+
+// ---------------------------------------------------------------------------
+// STEP 6: Compose citizen reply (using consolidated intent map — #16)
+// ---------------------------------------------------------------------------
 
 const composeCitizenReply = createStep({
   id: "compose-citizen-reply",
@@ -513,6 +601,10 @@ const composeCitizenReply = createStep({
   inputSchema: judgedResultSchema,
   outputSchema: composedResultSchema,
   execute: async ({ inputData, mastra }) => {
+    const t0 = Date.now();
+    const logger = mastra?.getLogger();
+    const config: ResolvedAppConfig = inputData.config;
+
     if (!inputData.shouldProcess) {
       return {
         ...inputData,
@@ -526,73 +618,35 @@ const composeCitizenReply = createStep({
       inputData.route.intent === "handoff_request" ||
       inputData.route.requestedHandoff;
 
-    if (handoffRequested) {
-      const handoffConfigured = await isHumanHandoffConfigured();
+    const handoffConfigured =
+      config.enableHandoff && hasHumanHandoffTarget(config);
+
+    // Use consolidated intent-to-reply mapping (#16)
+    const deterministicReply = buildReplyForIntent(
+      inputData.route,
+      inputData.judgement,
+      inputData.messageContent,
+      config,
+      { handoffConfigured },
+    );
+
+    if (deterministicReply !== null) {
+      if (logger) {
+        logStepMetrics(logger, "compose-citizen-reply", {
+          durationMs: Date.now() - t0,
+          extra: { source: "deterministic", intent: inputData.route.intent },
+        });
+      }
+
       return {
         ...inputData,
-        draftReply: handoffConfigured
-          ? await buildHandoffConfirmationReply()
-          : await buildUnavailableHandoffReply(inputData.messageContent),
+        draftReply: deterministicReply,
         shouldSend: true,
         handoffRequested,
       };
     }
 
-    if (inputData.route.intent === "smalltalk_or_greeting") {
-      return {
-        ...inputData,
-        draftReply: await buildGreetingReply(),
-        shouldSend: true,
-        handoffRequested: false,
-      };
-    }
-
-    if (inputData.route.intent === "out_of_scope") {
-      return {
-        ...inputData,
-        draftReply: await buildOutOfScopeReply(),
-        shouldSend: true,
-        handoffRequested: false,
-      };
-    }
-
-    if (
-      inputData.route.intent === "sensitive" ||
-      inputData.route.sensitivity === "sensitive"
-    ) {
-      return {
-        ...inputData,
-        draftReply: await buildSensitiveReply(),
-        shouldSend: true,
-        handoffRequested: false,
-      };
-    }
-
-    if (
-      inputData.route.intent === "needs_clarification" ||
-      inputData.route.requiresClarification ||
-      inputData.judgement.fallbackMode === "clarify"
-    ) {
-      return {
-        ...inputData,
-        draftReply: await buildClarificationReply(inputData.judgement.missingInfo),
-        shouldSend: true,
-        handoffRequested: false,
-      };
-    }
-
-    if (!inputData.judgement.answerable || inputData.evidence.length === 0) {
-      return {
-        ...inputData,
-        draftReply: await buildKnowledgeFallback(
-          inputData.judgement.fallbackMode,
-          inputData.messageContent,
-        ),
-        shouldSend: true,
-        handoffRequested: false,
-      };
-    }
-
+    // Only local_factual with sufficient evidence reaches here
     const responder = mastra?.getAgent("chatwootResponderAgent");
     if (!responder) {
       throw new Error("Chatwoot responder agent not found");
@@ -612,6 +666,7 @@ const composeCitizenReply = createStep({
       ],
       {
         maxSteps: 1,
+        abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
         memory: {
           thread: inputData.threadId,
           resource: inputData.resourceId,
@@ -623,6 +678,14 @@ const composeCitizenReply = createStep({
       },
     );
 
+    if (logger) {
+      logStepMetrics(logger, "compose-citizen-reply", {
+        durationMs: Date.now() - t0,
+        tokensUsed: extractTokenUsage(response),
+        extra: { source: "llm" },
+      });
+    }
+
     return {
       ...inputData,
       draftReply: response.text.trim(),
@@ -632,6 +695,10 @@ const composeCitizenReply = createStep({
   },
 });
 
+// ---------------------------------------------------------------------------
+// STEP 7: Sanitize reply (with PII detection — #18)
+// ---------------------------------------------------------------------------
+
 const sanitizeReply = createStep({
   id: "sanitize-outbound-reply",
   description:
@@ -640,6 +707,10 @@ const sanitizeReply = createStep({
   inputSchema: composedResultSchema,
   outputSchema: sanitizedResultSchema,
   execute: async ({ inputData, mastra }) => {
+    const t0 = Date.now();
+    const logger = mastra?.getLogger();
+    const config: ResolvedAppConfig = inputData.config;
+
     if (!inputData.shouldSend) {
       return {
         ...inputData,
@@ -652,9 +723,16 @@ const sanitizeReply = createStep({
       };
     }
 
-    const initialCheck = evaluateOutboundReply(inputData.draftReply);
+    // Pass config for PII detection (#18)
+    const initialCheck = evaluateOutboundReply(inputData.draftReply, config);
 
     if (initialCheck.isSafeForOutbound) {
+      if (logger) {
+        logStepMetrics(logger, "sanitize-outbound-reply", {
+          durationMs: Date.now() - t0,
+          extra: { result: "pass" },
+        });
+      }
       return {
         ...inputData,
         outboundReply: initialCheck.repairedText,
@@ -683,6 +761,7 @@ const sanitizeReply = createStep({
       ],
       {
         maxSteps: 1,
+        abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
         modelSettings: {
           temperature: 0.1,
           maxOutputTokens: 300,
@@ -690,8 +769,15 @@ const sanitizeReply = createStep({
       },
     );
 
-    const repairedCheck = evaluateOutboundReply(repaired.text);
+    const repairedCheck = evaluateOutboundReply(repaired.text, config);
     if (repairedCheck.isSafeForOutbound) {
+      if (logger) {
+        logStepMetrics(logger, "sanitize-outbound-reply", {
+          durationMs: Date.now() - t0,
+          tokensUsed: extractTokenUsage(repaired),
+          extra: { result: "repaired" },
+        });
+      }
       return {
         ...inputData,
         outboundReply: repairedCheck.repairedText,
@@ -699,8 +785,27 @@ const sanitizeReply = createStep({
       };
     }
 
-    const fallbackReply = await buildSafeFallbackReply(inputData);
-    const fallbackCheck = evaluateOutboundReply(fallbackReply);
+    // Final fallback: use deterministic safe reply
+    const fallbackReply = buildReplyForIntent(
+      inputData.route,
+      inputData.judgement,
+      inputData.messageContent,
+      config,
+    ) ?? buildKnowledgeFallback(
+      inputData.judgement.fallbackMode,
+      inputData.messageContent,
+      config,
+    );
+
+    const fallbackCheck = evaluateOutboundReply(fallbackReply, config);
+
+    if (logger) {
+      logStepMetrics(logger, "sanitize-outbound-reply", {
+        durationMs: Date.now() - t0,
+        tokensUsed: extractTokenUsage(repaired),
+        extra: { result: "fallback", reason: repairedCheck.reason },
+      });
+    }
 
     return {
       ...inputData,
@@ -714,6 +819,10 @@ const sanitizeReply = createStep({
   },
 });
 
+// ---------------------------------------------------------------------------
+// STEP 8: Send reply to Chatwoot
+// ---------------------------------------------------------------------------
+
 const sendReply = createStep({
   id: "send-outbound-reply",
   description: "Sends the outbound message back to Chatwoot",
@@ -724,6 +833,10 @@ const sendReply = createStep({
     handoffPerformed: z.boolean(),
   }),
   execute: async ({ inputData, mastra }) => {
+    const t0 = Date.now();
+    const logger = mastra?.getLogger();
+    const config: ResolvedAppConfig = inputData.config;
+
     if (!inputData.shouldSend) {
       return { success: true, handoffPerformed: false };
     }
@@ -732,43 +845,30 @@ const sendReply = createStep({
     let handoffPerformed = false;
 
     if (inputData.handoffRequested) {
-      const config = await getAppConfig();
       const handoffConfigured =
         config.enableHandoff && hasHumanHandoffTarget(config);
 
-      if (handoffConfigured) {
-        try {
-          await assignChatwootConversation({
-            accountId: inputData.accountId,
-            conversationId: inputData.conversationId,
-            assigneeId: config.handoffAssigneeId ?? undefined,
-            teamId: config.handoffTeamId ?? undefined,
-          });
+      const handoffResult = await performChatwootHandoff(
+        {
+          accountId: inputData.accountId,
+          config,
+          conversationId: inputData.conversationId,
+          handoffConfigured,
+          messageContent: inputData.messageContent,
+          senderName: inputData.senderName,
+        },
+        {
+          assignConversation: assignChatwootConversation,
+          buildConfirmationReply: buildHandoffConfirmationReply,
+          buildPrivateNote: buildHandoffPrivateNote,
+          buildUnavailableReply: buildUnavailableHandoffReply,
+          logger,
+          sendPrivateNote: sendChatwootMessage,
+        },
+      );
 
-          handoffPerformed = true;
-
-          await sendChatwootMessage({
-            accountId: inputData.accountId,
-            conversationId: inputData.conversationId,
-            content: await buildHandoffPrivateNote(
-              inputData.senderName,
-              inputData.messageContent,
-            ),
-            private: true,
-          });
-        } catch (error) {
-          const logger = mastra?.getLogger();
-          logger?.warn(
-            `Failed to hand off conversation ${inputData.conversationId}: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          );
-
-          outboundReply = await buildUnavailableHandoffReply(inputData.messageContent);
-        }
-      } else {
-        outboundReply = await buildUnavailableHandoffReply(inputData.messageContent);
-      }
+      handoffPerformed = handoffResult.handoffPerformed;
+      outboundReply = handoffResult.outboundReply;
     }
 
     const data = await sendChatwootMessage({
@@ -777,9 +877,20 @@ const sendReply = createStep({
       content: outboundReply,
     });
 
+    if (logger) {
+      logStepMetrics(logger, "send-outbound-reply", {
+        durationMs: Date.now() - t0,
+        extra: { handoffPerformed },
+      });
+    }
+
     return { success: true, messageId: data.id, handoffPerformed };
   },
 });
+
+// ---------------------------------------------------------------------------
+// Workflow: 7 steps
+// ---------------------------------------------------------------------------
 
 const chatwootWebhookWorkflow = createWorkflow({
   id: "chatwoot-webhook",

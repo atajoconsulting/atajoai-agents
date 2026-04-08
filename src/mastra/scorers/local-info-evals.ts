@@ -9,9 +9,10 @@ import {
   localInfoTrajectoryScorer,
 } from "./local-info";
 
-function buildWebhookInput(message: string) {
+export function buildWebhookInput(message: string) {
   return {
     event: "message_created",
+    id: Math.floor(Math.random() * 1_000_000),
     content: message,
     message_type: "incoming",
     private: false,
@@ -29,7 +30,7 @@ function buildWebhookInput(message: string) {
   };
 }
 
-function buildExpectedTrajectory() {
+export function buildExpectedTrajectory() {
   return {
     steps: [
       { stepType: "workflow_step" as const, name: "validate-webhook" },

@@ -14,6 +14,8 @@ const TRANSLATION_CONCURRENCY = 5;
 export interface IndexDocumentsOptions {
   vectorStore: ReturnType<import("@mastra/core").Mastra["getVector"]>;
   embedModel: ModelRouterEmbeddingModel;
+  /** The model identifier string (e.g. "mistral-embed") for tracking in Qdrant metadata */
+  embedModelName: string;
   translator: Agent;
   logger: ReturnType<import("@mastra/core").Mastra["getLogger"]>;
 }
@@ -42,7 +44,7 @@ export async function indexDocuments(
   documents: RagDocument[],
   options: IndexDocumentsOptions,
 ): Promise<IndexDocumentsResult> {
-  const { vectorStore, embedModel, translator, logger } = options;
+  const { vectorStore, embedModel, embedModelName, translator, logger } = options;
   let indexed = 0;
   let skipped = 0;
   let errors = 0;
@@ -101,6 +103,7 @@ export async function indexDocuments(
         chunkIndex: i,
         content: chunk.text,          // original language — for agent evidence
         searchContent: spanishTexts[i], // Spanish — what was embedded
+        embedModel: embedModelName,
         indexedAt: (doc.indexedAt ?? new Date()).toISOString(),
       }));
 

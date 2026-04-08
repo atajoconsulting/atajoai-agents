@@ -52,6 +52,11 @@ async function ensureQdrantSetup(): Promise<void> {
       fieldName: "searchContent",
       fieldSchema: "text",
     }),
+    qdrantVector.createPayloadIndex({
+      indexName: env.QDRANT_COLLECTION,
+      fieldName: "embedModel",
+      fieldSchema: "keyword",
+    }),
   ]);
 }
 

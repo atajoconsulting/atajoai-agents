@@ -1,4 +1,5 @@
-import { getAppConfig } from "./config";
+import { getAppConfig, getChatwootApiToken } from "./config";
+import { withRetry, RetryableError } from "./retry";
 
 export interface SendMessageParams {
   accountId: number;
@@ -34,31 +35,44 @@ async function chatwootRequest<T>(
   path: string,
   options: RequestInit,
 ): Promise<T> {
-  const config = await getAppConfig();
-  if (!config.chatwootBaseUrl || !config.chatwootApiToken) {
+  const [config, apiToken] = await Promise.all([getAppConfig(), getChatwootApiToken()]);
+  if (!config.chatwootBaseUrl || !apiToken) {
     throw new Error(
-      "Chatwoot API is not configured. Set chatwootBaseUrl and chatwootApiToken in app config or env",
+      "Chatwoot API is not configured. Set chatwootBaseUrl and chatwootApiToken in app config.",
     );
   }
 
   const baseUrl = config.chatwootBaseUrl.replace(/\/$/, "");
   const url = `${baseUrl}${path}`;
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      api_access_token: config.chatwootApiToken,
-      ...(options.headers ?? {}),
+  return withRetry(
+    async () => {
+      const response = await fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(10_000),
+        headers: {
+          "Content-Type": "application/json",
+          api_access_token: apiToken,
+          ...(options.headers ?? {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const retryable = [429, 500, 502, 503, 504].includes(response.status);
+        if (retryable) {
+          throw new RetryableError(
+            `Chatwoot API error (${response.status}): ${errorText}`,
+            response.status,
+          );
+        }
+        throw new Error(`Chatwoot API error (${response.status}): ${errorText}`);
+      }
+
+      return (await response.json()) as T;
     },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Chatwoot API error (${response.status}): ${errorText}`);
-  }
-
-  return (await response.json()) as T;
+    { maxRetries: 3, baseDelayMs: 500 },
+  );
 }
 
 export async function sendChatwootMessage(

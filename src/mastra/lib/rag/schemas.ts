@@ -62,6 +62,8 @@ export const qdrantChunkPayloadSchema = z.object({
   content: z.string(),
   /** Spanish chunk text — what was embedded, kept for debugging/audit */
   searchContent: z.string(),
+  /** Embedding model identifier used to generate the vector */
+  embedModel: z.string().optional(),
   indexedAt: z.string(),
 });
 

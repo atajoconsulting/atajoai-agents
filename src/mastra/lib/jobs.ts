@@ -56,6 +56,7 @@ async function getRuntimeIndexerDependencies(mastra: Mastra) {
 
   return {
     embedModel: new ModelRouterEmbeddingModel(config.embedModel),
+    embedModelName: config.embedModel,
     vectorStore,
     translator,
   };
@@ -236,7 +237,7 @@ async function runIndexJob(
       indexedAt: null,
     });
 
-    const { vectorStore, embedModel, translator } =
+    const { vectorStore, embedModel, embedModelName, translator } =
       await getRuntimeIndexerDependencies(mastra);
     const builtDocument = await builder();
 
@@ -246,6 +247,7 @@ async function runIndexJob(
     const result = await indexDocuments([builtDocument.ragDocument], {
       vectorStore,
       embedModel,
+      embedModelName,
       translator,
       logger,
     });

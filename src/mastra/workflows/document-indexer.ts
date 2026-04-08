@@ -120,6 +120,7 @@ const indexExtractedDocuments = createStep({
     const result = await indexDocuments(ragDocuments, {
       vectorStore,
       embedModel,
+      embedModelName: config.embedModel,
       translator,
       logger,
     });

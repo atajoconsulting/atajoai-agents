@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { env } from "../env";
-import { getAppConfig } from "./config";
+import type { ResolvedAppConfig } from "./config";
 
 export const localIntentSchema = z.enum([
   "local_factual",
@@ -82,9 +81,7 @@ const LOCAL_INFO_PATTERN =
 const SUBJECTIVE_QUERY_PATTERN =
   /\b(mejor|recomienda|recomiendas|recomendaci[oó]n|favorito|top|m[aá]s bonito|m[aá]s recomendable)\b/i;
 
-export function getOutboundStyleInstructions(
-  style: string = env.OUTBOUND_RESPONSE_STYLE,
-): string {
+export function getOutboundStyleInstructions(style: string): string {
   if (style === "brief_plain") {
     return [
       "Use un tono breve y natural para canales de atención ciudadana.",
@@ -125,7 +122,10 @@ export function normalizeOutboundReply(text: string): string {
     .trim();
 }
 
-export function evaluateOutboundReply(text: string): SanitizeReplyResult {
+export function evaluateOutboundReply(
+  text: string,
+  config?: ResolvedAppConfig,
+): SanitizeReplyResult {
   const repairedText = normalizeOutboundReply(text);
   const lines = repairedText
     .split("\n")
@@ -204,22 +204,21 @@ export function evaluateOutboundReply(text: string): SanitizeReplyResult {
   };
 }
 
-export async function buildOutOfScopeReply(): Promise<string> {
-  const config = await getAppConfig();
-  return (
-    config.outOfScopeMessage ??
-    `Disculpe, solo puedo ayudarle con información factual del ${config.orgName} y de la vida local del municipio. Si lo desea, puedo orientarle sobre servicios, instalaciones, eventos o recursos locales.`
-  );
+// ---------------------------------------------------------------------------
+// Reply builders — now synchronous, accept config as a parameter
+// ---------------------------------------------------------------------------
+
+export function buildOutOfScopeReply(config: ResolvedAppConfig): string {
+  return config.outOfScopeMessage;
 }
 
-export async function buildSensitiveReply(): Promise<string> {
-  const config = await getAppConfig();
+export function buildSensitiveReply(config: ResolvedAppConfig): string {
   return `Para este asunto, debe contactar directamente con el ${config.orgName} en el ${config.orgPhone} (${config.orgSchedule}).`;
 }
 
-export async function buildClarificationReply(
+export function buildClarificationReply(
   missingInfo: string[],
-): Promise<string> {
+): string {
   const hints = missingInfo.slice(0, 2);
   const detail =
     hints.length > 0
@@ -229,11 +228,11 @@ export async function buildClarificationReply(
   return `Necesito un poco más de información para ayudarle.${detail}`;
 }
 
-export async function buildKnowledgeFallback(
+export function buildKnowledgeFallback(
   mode: AnswerabilityFallback,
   originalQuestion: string,
-): Promise<string> {
-  const config = await getAppConfig();
+  config: ResolvedAppConfig,
+): string {
   switch (mode) {
     case "clarify":
       return buildClarificationReply([]);
@@ -242,9 +241,9 @@ export async function buildKnowledgeFallback(
     case "contact_office":
       return `No he podido confirmarlo con suficiente fiabilidad. Le recomiendo acudir al ${config.orgName} en ${config.orgAddress} o llamar al ${config.orgPhone}.`;
     case "safe_refusal":
-      return buildSensitiveReply();
+      return buildSensitiveReply(config);
     case "handoff":
-      return buildUnavailableHandoffReply(originalQuestion);
+      return buildUnavailableHandoffReply(originalQuestion, config);
     case "contact_phone":
     case "none":
     default:
@@ -252,10 +251,10 @@ export async function buildKnowledgeFallback(
   }
 }
 
-export async function buildUnavailableHandoffReply(
+export function buildUnavailableHandoffReply(
   originalQuestion: string,
-): Promise<string> {
-  const config = await getAppConfig();
+  config: ResolvedAppConfig,
+): string {
   const suffix = originalQuestion.trim()
     ? "Si lo desea, también puede escribir aquí su consulta concreta e intentaré orientarle con la información local disponible."
     : "Puede escribir aquí su consulta y trataré de orientarle con la información local disponible.";
@@ -267,30 +266,74 @@ export async function buildUnavailableHandoffReply(
   ].join(" ");
 }
 
-export async function buildHandoffConfirmationReply(): Promise<string> {
+export function buildHandoffConfirmationReply(): string {
   return "He trasladado su conversación al equipo de atención municipal. En cuanto sea posible, una persona continuará la atención por este mismo canal.";
 }
 
-export async function buildGreetingReply(): Promise<string> {
-  const config = await getAppConfig();
-  return (
-    config.greetingMessage ??
-    [
-      `Hola, soy el asistente virtual de información local del ${config.orgName}.`,
-      "Puedo ayudarle con trámites, servicios, instalaciones, eventos y recursos del municipio.",
-      "La información proporcionada está sujeta a posibles cambios o incidencias de última hora.",
-      "¿En qué puedo ayudarle?",
-    ].join(" ")
-  );
+export function buildGreetingReply(config: ResolvedAppConfig): string {
+  return config.greetingMessage;
 }
 
-export async function buildHandoffPrivateNote(
+export function buildHandoffPrivateNote(
   senderName: string,
   messageContent: string,
-): Promise<string> {
+): string {
   return [
     "[handoff solicitado por bot]",
     `Remitente: ${senderName || "Ciudadano"}`,
     `Motivo: ${messageContent}`,
   ].join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Consolidated intent-to-response mapping (FASE 3 #16)
+// Single source of truth for deterministic replies by intent/judgement.
+// ---------------------------------------------------------------------------
+
+export function buildReplyForIntent(
+  route: RouteMessageResult,
+  judgement: JudgeAnswerabilityResult,
+  messageContent: string,
+  config: ResolvedAppConfig,
+  options?: { handoffConfigured?: boolean },
+): string | null {
+  const handoffRequested =
+    route.intent === "handoff_request" || route.requestedHandoff;
+
+  if (handoffRequested) {
+    return options?.handoffConfigured
+      ? buildHandoffConfirmationReply()
+      : buildUnavailableHandoffReply(messageContent, config);
+  }
+
+  if (route.intent === "smalltalk_or_greeting") {
+    return buildGreetingReply(config);
+  }
+
+  if (route.intent === "out_of_scope") {
+    return buildOutOfScopeReply(config);
+  }
+
+  if (route.intent === "sensitive" || route.sensitivity === "sensitive") {
+    return buildSensitiveReply(config);
+  }
+
+  if (
+    route.intent === "needs_clarification" ||
+    route.requiresClarification ||
+    judgement.fallbackMode === "clarify"
+  ) {
+    return buildClarificationReply(judgement.missingInfo);
+  }
+
+  if (!judgement.answerable) {
+    return buildKnowledgeFallback(
+      judgement.fallbackMode,
+      messageContent,
+      config,
+    );
+  }
+
+  // null means: the LLM responder should generate the reply
+  return null;
 }

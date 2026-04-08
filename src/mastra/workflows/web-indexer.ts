@@ -97,6 +97,7 @@ const indexCrawledPages = createStep({
     const result = await indexDocuments(documents, {
       vectorStore,
       embedModel,
+      embedModelName: config.embedModel,
       translator,
       logger,
     });
