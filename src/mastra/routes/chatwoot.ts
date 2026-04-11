@@ -6,7 +6,6 @@ import { getAppConfig } from '../lib/config';
 export const chatwootRoutes = [
   registerApiRoute('/chatwoot/webhook', {
     method: 'POST',
-    requiresAuth: true,
     openapi: {
       summary: 'Chatwoot Webhook',
       description: 'Receive and process Chatwoot webhook events',
