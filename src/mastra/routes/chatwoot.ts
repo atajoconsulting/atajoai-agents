@@ -1,5 +1,5 @@
 import { registerApiRoute } from '@mastra/core/server';
-import { sendChatwootMessage } from '../lib/chatwoot-api';
+import { sendChatwootMessage, unassignChatwootConversation } from '../lib/chatwoot-api';
 import { launchChatwootWorkflowRun } from '../lib/chatwoot-workflow-launcher';
 import { getAppConfig } from '../lib/config';
 
@@ -43,6 +43,29 @@ export const chatwootRoutes = [
       const body = await c.req.json();
 
       logger.info('Received event:', { event: body.event });
+
+      // Auto-unassign on resolution so the bot can resume processing.
+      // In conversation_status_changed, conversation attributes are at the top level.
+      if (body.event === 'conversation_status_changed') {
+        const convId: number | undefined = body.id;
+        const acctId: number | undefined = body.account_id ?? body.account?.id;
+        const newStatus: string | undefined = body.status;
+        const hasAssignee = Boolean(body.meta?.assignee?.id);
+
+        if (newStatus === 'resolved' && convId && acctId && hasAssignee) {
+          void unassignChatwootConversation({ accountId: acctId, conversationId: convId })
+            .then(() =>
+              logger.info(`Auto-unassigned conversation ${convId} after resolution`),
+            )
+            .catch((err: unknown) => {
+              logger.error(
+                `Failed to auto-unassign conversation ${convId}: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            });
+        }
+
+        return c.json({ status: 'accepted' }, 200);
+      }
 
       const accountId: number | undefined = body.account?.id;
       const conversationId: number | undefined = body.conversation?.id;
