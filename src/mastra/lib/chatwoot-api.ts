@@ -111,20 +111,3 @@ export async function assignChatwootConversation(
     },
   );
 }
-
-export interface UnassignConversationParams {
-  accountId: number;
-  conversationId: number;
-}
-
-export async function unassignChatwootConversation(
-  params: UnassignConversationParams,
-): Promise<void> {
-  await chatwootRequest<unknown>(
-    `/api/v1/accounts/${params.accountId}/conversations/${params.conversationId}/assignments`,
-    {
-      method: "POST",
-      body: JSON.stringify({ assignee_id: 0 }),
-    },
-  );
-}

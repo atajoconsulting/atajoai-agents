@@ -59,11 +59,6 @@ export const chatwootWebhookSchema = z.object({
   conversation: z.object({
     id: z.number(),
     channel: z.string().optional(),
-    meta: z.object({
-      assignee: z.object({
-        id: z.number(),
-      }).nullable().optional(),
-    }).optional(),
   }).optional(),
 });
 
@@ -334,16 +329,6 @@ const validateWebhook = createStep({
       !inputData.account ||
       !inputData.conversation
     ) {
-      abort();
-      return skip;
-    }
-
-    // Skip if a human agent is assigned (HITL — before dedup to avoid consuming the slot)
-    const assignee = inputData.conversation?.meta?.assignee;
-    if (assignee && assignee.id) {
-      logger?.debug(
-        `[validate] Conversation ${inputData.conversation!.id} assigned to agent ${assignee.id} — skipping`,
-      );
       abort();
       return skip;
     }
