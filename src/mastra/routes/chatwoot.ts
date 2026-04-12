@@ -15,22 +15,82 @@ export const chatwootRoutes = [
           'application/json': {
             schema: {
               type: 'object',
+              additionalProperties: true,
               properties: {
-                id: { type: 'number' },
-                event: { type: 'string' },
-                content: { type: 'string' },
-                message_type: { type: 'string' },
+                event: { type: 'string', description: 'message_created | message_updated | conversation_resolved | conversation_opened | webwidget_triggered' },
+                id: { type: 'number', description: 'Message primary key' },
+                content: { type: ['string', 'null'] },
+                content_type: { type: 'string', description: 'text | input_text | cards | form | incoming_email | ...' },
+                message_type: { type: 'string', description: 'incoming | outgoing | template' },
                 private: { type: 'boolean' },
-                sender: {},
+                source_id: { type: ['string', 'null'], description: 'External message ID (e.g. WhatsApp)' },
+                created_at: { type: 'string', description: 'ISO 8601' },
+                content_attributes: {
+                  type: 'object',
+                  additionalProperties: true,
+                  properties: {
+                    in_reply_to: { type: ['string', 'null'] },
+                    deleted: { type: ['boolean', 'null'] },
+                    is_unsupported: { type: ['boolean', 'null'] },
+                  },
+                },
                 account: {
                   type: 'object',
-                  properties: { id: { type: 'number' } },
+                  additionalProperties: true,
+                  properties: { id: { type: 'number' }, name: { type: 'string' } },
+                },
+                inbox: {
+                  type: 'object',
+                  additionalProperties: true,
+                  properties: { id: { type: 'number' }, name: { type: 'string' } },
+                },
+                sender: {
+                  type: 'object',
+                  additionalProperties: true,
+                  properties: {
+                    id: { type: 'number' },
+                    type: { type: 'string' },
+                    name: { type: 'string' },
+                    email: { type: ['string', 'null'] },
+                    phone_number: { type: ['string', 'null'] },
+                    identifier: { type: ['string', 'null'] },
+                    blocked: { type: 'boolean' },
+                  },
                 },
                 conversation: {
                   type: 'object',
-                  properties: { id: { type: 'number' } },
+                  additionalProperties: true,
+                  properties: {
+                    id: { type: 'number', description: 'display_id (human-readable)' },
+                    inbox_id: { type: 'number' },
+                    status: { type: 'string', description: 'open | resolved | pending | snoozed' },
+                    channel: { type: ['string', 'null'] },
+                    can_reply: { type: 'boolean' },
+                    labels: { type: 'array', items: { type: 'string' } },
+                    priority: { type: ['string', 'null'] },
+                    meta: {
+                      type: 'object',
+                      additionalProperties: true,
+                      properties: {
+                        assignee: {
+                          type: ['object', 'null'],
+                          properties: {
+                            id: { type: 'number' },
+                            name: { type: 'string' },
+                            type: { type: 'string', description: 'user | agent_bot' },
+                          },
+                        },
+                        assignee_type: { type: ['string', 'null'], description: 'User | AgentBot | null' },
+                        team: {
+                          type: ['object', 'null'],
+                          properties: { id: { type: 'number' }, name: { type: 'string' } },
+                        },
+                      },
+                    },
+                  },
                 },
-              }
+              },
+              required: ['event'],
             },
           }
         }
@@ -46,8 +106,6 @@ export const chatwootRoutes = [
       const accountId: number | undefined = body.account?.id;
       const conversationId: number | undefined = body.conversation?.id;
 
-      // Fire-and-forget: respond 200 immediately so Chatwoot doesn't time out.
-      // On failure, send a fallback message so the citizen is never left hanging.
       await launchChatwootWorkflowRun({
         body,
         logger,

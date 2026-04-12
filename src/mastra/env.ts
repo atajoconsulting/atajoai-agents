@@ -1,11 +1,6 @@
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 
-const optionalBooleanFlag = z
-  .enum(["true", "false"])
-  .transform((value) => value === "true")
-  .optional();
-
 export const env = createEnv({
   server: {
     CHATWOOT_API_TOKEN: z.string().min(1).optional(),
@@ -13,8 +8,6 @@ export const env = createEnv({
       .string()
       .length(64)
       .regex(/^[0-9a-f]+$/i, "Must be a 64-char hex string (32 bytes)"),
-    CHATWOOT_PANEL_API_KEY: z.string().min(1).default("changeme"),
-    MASTRA_AUTH_ENABLED: optionalBooleanFlag,
     REDIS_URL: z.string().min(1),
     ENABLE_STARTUP_CHECKS: z
       .enum(["true", "false"])

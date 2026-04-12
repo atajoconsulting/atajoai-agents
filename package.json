@@ -6,7 +6,9 @@
   "scripts": {
     "test": "node --experimental-strip-types --experimental-specifier-resolution=node --test tests/resilience-regressions.test.ts",
     "dev": "mastra dev",
-    "build": "mastra build",
+    "dev:debug": "mastra dev --inspect --debug",
+    "dev:debug-brk": "mastra dev --inspect-brk --debug",
+    "build": "mastra build --studio",
     "start": "mastra start"
   },
   "keywords": [],

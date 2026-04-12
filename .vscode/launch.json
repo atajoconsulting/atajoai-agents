@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node-terminal",
+            "name": "Mastra Dev (Debug)",
+            "request": "launch",
+            "command": "pnpm run dev:debug",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "node-terminal",
+            "name": "Mastra Dev (Break on Start)",
+            "request": "launch",
+            "command": "pnpm run dev:debug-brk",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Attach to Mastra",
+            "type": "node",
+            "request": "attach",
+            "port": 9229,
+            "restart": true,
+            "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+        }
+    ]
+}

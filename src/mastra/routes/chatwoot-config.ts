@@ -118,7 +118,7 @@ export const chatwootConfigRoutes = [
       logger.debug("Config fetched");
       return c.json({
         ...serializeAppConfig(config),
-        chatwootApiToken: apiToken ? "******" : null,
+        chatwootApiToken: apiToken ?? null,
       }, 200);
     },
   }),
@@ -210,7 +210,7 @@ export const chatwootConfigRoutes = [
       logger.debug(`Config updated: ${changedKeys.join(", ")}`);
       return c.json({
         ...serializeAppConfig(updatedConfig),
-        chatwootApiToken: updatedToken ? "******" : null,
+        chatwootApiToken: updatedToken ?? null,
       }, 200);
     },
   }),

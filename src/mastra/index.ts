@@ -1,6 +1,5 @@
 import { Mastra } from "@mastra/core/mastra";
 import { seedDefaultConfig } from "./lib/seed";
-import { SimpleAuth } from "@mastra/core/server";
 import { qdrantVector } from "./vectors/qdrant";
 import { PinoLogger } from "@mastra/loggers";
 import {
@@ -23,9 +22,6 @@ import { apiRoutes } from "./routes";
 import { env } from "./env";
 import { runStartupChecks } from "./lib/health";
 import { getAppConfig } from "./lib/config";
-
-const mastraAuthEnabled =
-  env.MASTRA_AUTH_ENABLED ?? env.NODE_ENV === "production";
 
 export const mastra = new Mastra({
   // NOTE: runStartupChecks is called below after the instance is exported.
@@ -50,18 +46,6 @@ export const mastra = new Mastra({
   }),
   server: {
     host: "0.0.0.0",
-    ...(mastraAuthEnabled && {
-      auth: new SimpleAuth({
-        tokens: {
-          [env.CHATWOOT_PANEL_API_KEY]: {
-            id: "chatwoot-panel",
-            role: "admin",
-          },
-        },
-        headers: ["Authorization", "X-API-Key"],
-        public: ["/api/openapi.json", /^\/swagger-ui/],
-      }),
-    }),
     cors: false,
     middleware: [
       async (c, next) => {

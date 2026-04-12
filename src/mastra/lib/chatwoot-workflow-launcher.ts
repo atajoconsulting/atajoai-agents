@@ -47,8 +47,8 @@ export async function launchChatwootWorkflowRun({
     releaseAttachedToRun = true;
 
     void runPromise
-      .then((result: unknown) => {
-        logger.info("Workflow completed", { result });
+      .then(() => {
+        logger.info("Workflow completed");
       })
       .catch(async (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
