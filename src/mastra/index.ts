@@ -52,7 +52,7 @@ export const mastra = new Mastra({
     level: env.NODE_ENV === "production" ? "info" : "debug",
   }),
   server: {
-    host: "localhost",
+    host: env.MASTRA_HOST,
     cors: false,
     middleware: [
       async (c, next) => {

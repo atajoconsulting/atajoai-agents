@@ -3,6 +3,10 @@ import { z } from "zod";
 
 export const env = createEnv({
   server: {
+    /** Interface the server binds to. Defaults to localhost so it is not
+     *  exposed by accident; set 0.0.0.0 when containers on the same host
+     *  must reach it. */
+    MASTRA_HOST: z.string().default("localhost"),
     /** Shared secret sent as X-API-Key by Chatwoot to authenticate
      *  every /chatwoot/* request. Required in production. */
     MASTRA_API_KEY: z.string().min(1).optional(),
