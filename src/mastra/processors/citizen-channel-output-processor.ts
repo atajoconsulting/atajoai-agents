@@ -41,6 +41,7 @@ export class CitizenChannelOutputProcessor extends BaseProcessor<"citizen-channe
 
   async processOutputStep({
     text,
+    messages,
     abort,
     retryCount,
   }: ProcessOutputStepArgs): Promise<ProcessOutputStepArgs["messages"]> {
@@ -58,7 +59,11 @@ export class CitizenChannelOutputProcessor extends BaseProcessor<"citizen-channe
       );
     }
 
-    return [];
+    // The runner removes any listed message id that the processor does not
+    // return, so returning [] here would wipe the conversation from the
+    // MessageList and silently break memory persistence. Return the
+    // untouched messages to signal "no changes".
+    return messages;
   }
 
   async processOutputResult({
