@@ -32,6 +32,7 @@ const sourceTypeSchema = z.enum(["web", "pdf", "docx", "txt"]);
 
 const documentSchema = z.object({
   id: z.uuid(),
+  tenantId: z.string(),
   source: z.string(),
   sourceType: sourceTypeSchema,
   title: z.string().nullable(),
@@ -98,6 +99,7 @@ const patchDocumentBodySchema = z
 function serializeDocument(document: Awaited<ReturnType<typeof prisma.indexedDocument.findFirstOrThrow>>) {
   return {
     id: document.id,
+    tenantId: document.tenantId,
     source: document.source,
     sourceType: document.sourceType,
     title: document.title,
@@ -126,13 +128,21 @@ function openApiJsonSchema(schema: z.ZodTypeAny) {
   return z.toJSONSchema(schema, { unrepresentable: "any" }) as any;
 }
 
+const tenantIdParam = {
+  in: "path" as const,
+  name: "tenantId",
+  required: true,
+  schema: { type: "string" as const },
+};
+
 export const chatwootDocumentRoutes = [
-  registerApiRoute("/chatwoot/documents", {
+  registerApiRoute("/chatwoot/:tenantId/documents", {
     method: "GET",
     openapi: {
-      summary: "List indexed documents",
+      summary: "List indexed documents for a tenant",
       tags: ["Chatwoot Documents"],
       parameters: [
+        tenantIdParam,
         {
           in: "query",
           name: "status",
@@ -171,13 +181,14 @@ export const chatwootDocumentRoutes = [
       },
     },
     handler: async (c) => {
+      const tenantId = c.req.param("tenantId");
       const logger = c.get("mastra").getLogger();
       const parsed = documentListQuerySchema.safeParse(c.req.query());
       if (!parsed.success) {
         return c.json({ error: "Invalid query parameters" }, 400);
       }
       const query = parsed.data;
-      const where: Prisma.IndexedDocumentWhereInput = {};
+      const where: Prisma.IndexedDocumentWhereInput = { tenantId };
 
       if (query.status) {
         where.status = query.status;
@@ -206,7 +217,7 @@ export const chatwootDocumentRoutes = [
         prisma.indexedDocument.count({ where }),
       ]);
 
-      logger.debug(`Documents listed: ${total} results (page=${query.page}, perPage=${query.perPage})`, { filters: query });
+      logger.debug(`Documents listed: ${total} results (tenant=${tenantId}, page=${query.page}, perPage=${query.perPage})`, { filters: query });
       return c.json(
         {
           items: items.map(serializeDocument),
@@ -216,11 +227,12 @@ export const chatwootDocumentRoutes = [
       );
     },
   }),
-  registerApiRoute("/chatwoot/documents/index-url", {
+  registerApiRoute("/chatwoot/:tenantId/documents/index-url", {
     method: "POST",
     openapi: {
-      summary: "Index a URL",
+      summary: "Index a URL for a tenant",
       tags: ["Chatwoot Documents"],
+      parameters: [tenantIdParam],
       requestBody: {
         required: true,
         content: {
@@ -241,6 +253,7 @@ export const chatwootDocumentRoutes = [
       },
     },
     handler: async (c) => {
+      const tenantId = c.req.param("tenantId");
       const logger = c.get("mastra").getLogger();
       const body = await parseJsonBody(c.req.raw, indexUrlBodySchema);
       if (!body) {
@@ -251,6 +264,7 @@ export const chatwootDocumentRoutes = [
       try {
         created = await prisma.indexedDocument.create({
           data: {
+            tenantId,
             source: body.url,
             sourceType: "web",
             title: body.title ?? null,
@@ -261,9 +275,9 @@ export const chatwootDocumentRoutes = [
       } catch (error) {
         if (isPrismaUniqueViolation(error)) {
           const existing = await prisma.indexedDocument.findFirst({
-            where: { source: body.url, sourceType: "web" },
+            where: { tenantId, source: body.url, sourceType: "web" },
           });
-          logger.debug(`Index-url rejected: duplicate URL ${body.url}`);
+          logger.debug(`Index-url rejected: duplicate URL ${body.url} for tenant ${tenantId}`);
           return c.json(
             { error: "A document for this URL already exists", id: existing?.id },
             409,
@@ -278,17 +292,18 @@ export const chatwootDocumentRoutes = [
         title: body.title ?? null,
       });
 
-      logger.debug(`Index-url accepted: ${body.url} (id=${created.id})`);
+      logger.debug(`Index-url accepted: ${body.url} (id=${created.id}, tenant=${tenantId})`);
       return c.json({ status: "accepted", id: created.id }, 202);
     },
   }),
-  registerApiRoute("/chatwoot/documents/index-file", {
+  registerApiRoute("/chatwoot/:tenantId/documents/index-file", {
     method: "POST",
     openapi: {
-      summary: "Index a file reference",
+      summary: "Index a file reference for a tenant",
       tags: ["Chatwoot Documents"],
       description:
         "Accepts an S3/object-storage key and can optionally consume inline base64 content or a download URL.",
+      parameters: [tenantIdParam],
       requestBody: {
         required: true,
         content: {
@@ -309,6 +324,7 @@ export const chatwootDocumentRoutes = [
       },
     },
     handler: async (c) => {
+      const tenantId = c.req.param("tenantId");
       const logger = c.get("mastra").getLogger();
       const body = await parseJsonBody(c.req.raw, indexFileBodySchema);
       if (!body) {
@@ -327,6 +343,7 @@ export const chatwootDocumentRoutes = [
       try {
         created = await prisma.indexedDocument.create({
           data: {
+            tenantId,
             source: body.fileName,
             sourceType: body.sourceType,
             title: body.title ?? body.fileName.replace(/\.[^.]+$/, ""),
@@ -338,9 +355,9 @@ export const chatwootDocumentRoutes = [
       } catch (error) {
         if (isPrismaUniqueViolation(error)) {
           const existing = await prisma.indexedDocument.findFirst({
-            where: { source: body.fileName, sourceType: body.sourceType },
+            where: { tenantId, source: body.fileName, sourceType: body.sourceType },
           });
-          logger.debug(`Index-file rejected: duplicate source ${body.fileName} (${body.sourceType})`);
+          logger.debug(`Index-file rejected: duplicate source ${body.fileName} (${body.sourceType}) for tenant ${tenantId}`);
           return c.json(
             { error: "A document for this file already exists", id: existing?.id },
             409,
@@ -358,11 +375,11 @@ export const chatwootDocumentRoutes = [
         downloadUrl: body.downloadUrl ?? null,
       });
 
-      logger.debug(`Index-file accepted: ${body.fileName} (id=${created.id}, type=${body.sourceType})`);
+      logger.debug(`Index-file accepted: ${body.fileName} (id=${created.id}, type=${body.sourceType}, tenant=${tenantId})`);
       return c.json({ status: "accepted", id: created.id }, 202);
     },
   }),
-  registerApiRoute("/chatwoot/documents/:id/reindex", {
+  registerApiRoute("/chatwoot/:tenantId/documents/:id/reindex", {
     method: "POST",
     openapi: {
       summary: "Reindex a document",
@@ -370,6 +387,7 @@ export const chatwootDocumentRoutes = [
         "Re-processes a document. Web documents are re-crawled. File documents (pdf, docx, txt) are re-read from S3.",
       tags: ["Chatwoot Documents"],
       parameters: [
+        tenantIdParam,
         {
           in: "path",
           name: "id",
@@ -389,9 +407,12 @@ export const chatwootDocumentRoutes = [
       },
     },
     handler: async (c) => {
+      const tenantId = c.req.param("tenantId");
       const logger = c.get("mastra").getLogger();
       const id = c.req.param("id");
-      const document = await prisma.indexedDocument.findUnique({ where: { id } });
+      const document = await prisma.indexedDocument.findFirst({
+        where: { id, tenantId },
+      });
 
       if (!document) {
         return c.json({ error: "Document not found" }, 404);
@@ -431,16 +452,17 @@ export const chatwootDocumentRoutes = [
         });
       }
 
-      logger.debug(`Reindex accepted: ${document.source} (id=${id}, type=${document.sourceType})`);
+      logger.debug(`Reindex accepted: ${document.source} (id=${id}, type=${document.sourceType}, tenant=${tenantId})`);
       return c.json({ status: "accepted", id: document.id }, 202);
     },
   }),
-  registerApiRoute("/chatwoot/documents/:id", {
+  registerApiRoute("/chatwoot/:tenantId/documents/:id", {
     method: "PATCH",
     openapi: {
       summary: "Update indexed document metadata",
       tags: ["Chatwoot Documents"],
       parameters: [
+        tenantIdParam,
         {
           in: "path",
           name: "id",
@@ -468,6 +490,7 @@ export const chatwootDocumentRoutes = [
       },
     },
     handler: async (c) => {
+      const tenantId = c.req.param("tenantId");
       const logger = c.get("mastra").getLogger();
       const id = c.req.param("id");
       const body = await parseJsonBody(c.req.raw, patchDocumentBodySchema);
@@ -475,7 +498,9 @@ export const chatwootDocumentRoutes = [
         return c.json({ error: "Invalid document patch payload" }, 400);
       }
 
-      const existing = await prisma.indexedDocument.findUnique({ where: { id } });
+      const existing = await prisma.indexedDocument.findFirst({
+        where: { id, tenantId },
+      });
       if (!existing) {
         return c.json({ error: "Document not found" }, 404);
       }
@@ -493,16 +518,17 @@ export const chatwootDocumentRoutes = [
         data,
       });
 
-      logger.debug(`Document updated: ${id}`, { changes: Object.keys(data) });
+      logger.debug(`Document updated: ${id} (tenant=${tenantId})`, { changes: Object.keys(data) });
       return c.json(serializeDocument(updated), 200);
     },
   }),
-  registerApiRoute("/chatwoot/documents/:id", {
+  registerApiRoute("/chatwoot/:tenantId/documents/:id", {
     method: "DELETE",
     openapi: {
       summary: "Delete an indexed document",
       tags: ["Chatwoot Documents"],
       parameters: [
+        tenantIdParam,
         {
           in: "path",
           name: "id",
@@ -522,9 +548,12 @@ export const chatwootDocumentRoutes = [
       },
     },
     handler: async (c) => {
+      const tenantId = c.req.param("tenantId");
       const logger = c.get("mastra").getLogger();
       const id = c.req.param("id");
-      const existing = await prisma.indexedDocument.findUnique({ where: { id } });
+      const existing = await prisma.indexedDocument.findFirst({
+        where: { id, tenantId },
+      });
 
       if (!existing) {
         return c.json({ error: "Document not found" }, 404);
@@ -539,16 +568,17 @@ export const chatwootDocumentRoutes = [
       });
 
       enqueueDocumentDeletion(c.get("mastra"), { documentId: id });
-      logger.debug(`Document deletion accepted: ${existing.source} (id=${id})`);
+      logger.debug(`Document deletion accepted: ${existing.source} (id=${id}, tenant=${tenantId})`);
       return c.json({ status: "accepted", id }, 202);
     },
   }),
-  registerApiRoute("/chatwoot/documents/:id/chunks", {
+  registerApiRoute("/chatwoot/:tenantId/documents/:id/chunks", {
     method: "GET",
     openapi: {
       summary: "List indexed chunks for a document",
       tags: ["Chatwoot Documents"],
       parameters: [
+        tenantIdParam,
         {
           in: "path",
           name: "id",
@@ -583,10 +613,13 @@ export const chatwootDocumentRoutes = [
       },
     },
     handler: async (c) => {
+      const tenantId = c.req.param("tenantId");
       const logger = c.get("mastra").getLogger();
       const id = c.req.param("id");
 
-      const document = await prisma.indexedDocument.findUnique({ where: { id } });
+      const document = await prisma.indexedDocument.findFirst({
+        where: { id, tenantId },
+      });
       if (!document) {
         return c.json({ error: "Document not found" }, 404);
       }
@@ -610,7 +643,10 @@ export const chatwootDocumentRoutes = [
       do {
         const page: ScrollPage = await client.scroll(env.QDRANT_COLLECTION, {
           filter: {
-            must: [{ key: "documentId", match: { value: id } }],
+            must: [
+              { key: "documentId", match: { value: id } },
+              { key: "tenantId", match: { value: tenantId } },
+            ],
           },
           with_payload: true,
           with_vector: false,
@@ -634,7 +670,7 @@ export const chatwootDocumentRoutes = [
 
       allChunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
 
-      logger.debug(`Chunks listed for document ${id}: ${allChunks.length} chunks`);
+      logger.debug(`Chunks listed for document ${id}: ${allChunks.length} chunks (tenant=${tenantId})`);
       return c.json({ chunks: allChunks }, 200);
     },
   }),

@@ -3,13 +3,21 @@ import { sendChatwootMessage } from '../lib/chatwoot-api';
 import { launchChatwootWorkflowRun } from '../lib/chatwoot-workflow-launcher';
 import { getAppConfig } from '../lib/config';
 
+const tenantIdParam = {
+  in: "path" as const,
+  name: "tenantId",
+  required: true,
+  schema: { type: "string" as const },
+};
+
 export const chatwootRoutes = [
-  registerApiRoute('/chatwoot/webhook', {
+  registerApiRoute('/chatwoot/webhook/:tenantId', {
     method: 'POST',
     openapi: {
       summary: 'Chatwoot Webhook',
-      description: 'Receive and process Chatwoot webhook events',
+      description: 'Receive and process Chatwoot webhook events for a specific tenant',
       tags: ['Chatwoot'],
+      parameters: [tenantIdParam],
       requestBody: {
         content: {
           'application/json': {
@@ -99,9 +107,10 @@ export const chatwootRoutes = [
     handler: async (c) => {
       const mastra = c.get('mastra');
       const logger = mastra.getLogger();
+      const tenantId = c.req.param('tenantId');
       const body = await c.req.json();
 
-      logger.info('Received event:', { event: body.event });
+      logger.info('Received event:', { event: body.event, tenantId });
 
       const accountId: number | undefined = body.account?.id;
       const conversationId: number | undefined = body.conversation?.id;
@@ -110,16 +119,18 @@ export const chatwootRoutes = [
         body,
         logger,
         mastra,
+        tenantId,
         onRunError: async () => {
           if (accountId === undefined || conversationId === undefined) {
             return;
           }
 
-          await getAppConfig()
+          await getAppConfig(tenantId)
             .then((config) =>
               sendChatwootMessage({
                 accountId,
                 conversationId,
+                tenantId,
                 content:
                   `Lo sentimos, ha ocurrido un error procesando tu mensaje. ` +
                   `Por favor, inténtalo de nuevo o contacta con nosotros en el ${config.orgPhone}.`,
@@ -130,7 +141,7 @@ export const chatwootRoutes = [
                 sendErr instanceof Error ? sendErr.message : String(sendErr);
               logger.error(
                 `[chatwoot-route] Failed to send fallback error message ` +
-                `(account=${accountId}, conversation=${conversationId}): ${sendMsg}`,
+                `(tenant=${tenantId}, account=${accountId}, conversation=${conversationId}): ${sendMsg}`,
               );
             });
         },

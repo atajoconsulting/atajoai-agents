@@ -3,7 +3,13 @@ import { z } from "zod";
 
 export const env = createEnv({
   server: {
-    CHATWOOT_API_TOKEN: z.string().min(1).optional(),
+    /** Shared secret sent as X-API-Key by Chatwoot to authenticate
+     *  every /chatwoot/* request. Required in production. */
+    MASTRA_API_KEY: z.string().min(1).optional(),
+    /** Global Chatwoot base URL (e.g. https://chat.example.com). Used by
+     *  the Mastra → Chatwoot outbound API client. Set in the same
+     *  environment as MASTRA_API_KEY. */
+    CHATWOOT_BASE_URL: z.string().min(1).optional(),
     ENCRYPTION_KEY: z
       .string()
       .length(64)

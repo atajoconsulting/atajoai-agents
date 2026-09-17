@@ -2,12 +2,8 @@ import { Mastra } from "@mastra/core/mastra";
 import { seedDefaultConfig } from "./lib/seed";
 import { qdrantVector } from "./vectors/qdrant";
 import { PinoLogger } from "@mastra/loggers";
-import {
-  Observability,
-  DefaultExporter,
-  SensitiveDataFilter,
-} from "@mastra/observability";
-import { PostgresStore } from "@mastra/pg";
+
+import { PostgresStore, ScoresPG } from "@mastra/pg";
 import { chatwootWebhookWorkflow } from "./workflows/chatwoot-webhook";
 import { webIndexerWorkflow } from "./workflows/web-indexer";
 import { documentIndexerWorkflow } from "./workflows/document-indexer";
@@ -21,7 +17,15 @@ import { translatorAgent } from "./agents/translator-agent";
 import { apiRoutes } from "./routes";
 import { env } from "./env";
 import { runStartupChecks } from "./lib/health";
-import { getAppConfig } from "./lib/config";
+import { chatwootApiKeyAuth } from "./middleware/auth";
+import { MastraCompositeStore } from "@mastra/core/storage";
+
+const pgStore = new PostgresStore({
+  id: "pg-storage",
+  connectionString: env.DATABASE_URL,
+  max: 30,
+  idleTimeoutMillis: 60000,
+});
 
 export const mastra = new Mastra({
   // NOTE: runStartupChecks is called below after the instance is exported.
@@ -34,25 +38,27 @@ export const mastra = new Mastra({
     answerabilityJudgeAgent,
     translatorAgent,
   },
-  storage: new PostgresStore({
-    id: "pg-storage",
-    connectionString: env.DATABASE_URL,
-    max: 30,
-    idleTimeoutMillis: 60000,
+  storage: new MastraCompositeStore({
+    id: "composite-storage",
+    default: pgStore,
+    domains: {
+      scores: new ScoresPG({
+        connectionString: env.DATABASE_URL,
+      }),
+    },
   }),
   logger: new PinoLogger({
     name: "Mastra",
     level: env.NODE_ENV === "production" ? "info" : "debug",
   }),
   server: {
-    host: "0.0.0.0",
+    host: "localhost",
     cors: false,
     middleware: [
       async (c, next) => {
-        const config = await getAppConfig();
         c.header(
           "Access-Control-Allow-Origin",
-          config.chatwootBaseUrl ?? "*",
+          env.CHATWOOT_BASE_URL ?? "*",
         );
         c.header(
           "Access-Control-Allow-Methods",
@@ -69,6 +75,13 @@ export const mastra = new Mastra({
 
         await next();
       },
+      // X-API-Key auth for all /chatwoot/* routes
+      async (c, next) => {
+        if (c.req.path.startsWith("/chatwoot/")) {
+          return chatwootApiKeyAuth(c, next);
+        }
+        await next();
+      },
       async (c, next) => {
         const start = Date.now();
         await next();
@@ -82,15 +95,6 @@ export const mastra = new Mastra({
     },
     apiRoutes,
   },
-  observability: new Observability({
-    configs: {
-      default: {
-        serviceName: "mastra",
-        exporters: [new DefaultExporter()],
-        spanOutputProcessors: [new SensitiveDataFilter()],
-      },
-    },
-  }),
 });
 
 seedDefaultConfig().catch((err: unknown) => {

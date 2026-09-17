@@ -32,6 +32,7 @@ export const sendReply = createStep({
     const t0 = Date.now();
     const logger = mastra?.getLogger();
     const config: ResolvedAppConfig = inputData.config;
+    const tenantId: string = inputData.tenantId;
 
     if (!inputData.shouldSend) {
       return { success: true, handoffPerformed: false };
@@ -54,12 +55,14 @@ export const sendReply = createStep({
           senderName: inputData.senderName,
         },
         {
-          assignConversation: assignChatwootConversation,
+          assignConversation: (input) =>
+            assignChatwootConversation({ ...input, tenantId }),
           buildConfirmationReply: buildHandoffConfirmationReply,
           buildPrivateNote: buildHandoffPrivateNote,
           buildUnavailableReply: buildUnavailableHandoffReply,
           logger,
-          sendPrivateNote: sendChatwootMessage,
+          sendPrivateNote: (input) =>
+            sendChatwootMessage({ ...input, tenantId }),
         },
       );
 
@@ -70,13 +73,14 @@ export const sendReply = createStep({
     const data = await sendChatwootMessage({
       accountId: inputData.accountId,
       conversationId: inputData.conversationId,
+      tenantId,
       content: outboundReply,
     });
 
     if (logger) {
       logStepMetrics(logger, "send-outbound-reply", {
         durationMs: Date.now() - t0,
-        extra: { handoffPerformed },
+        extra: { handoffPerformed, tenantId },
       });
     }
 

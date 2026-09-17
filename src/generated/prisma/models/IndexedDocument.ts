@@ -36,6 +36,7 @@ export type IndexedDocumentSumAggregateOutputType = {
 
 export type IndexedDocumentMinAggregateOutputType = {
   id: string | null
+  tenantId: string | null
   source: string | null
   sourceType: $Enums.SourceType | null
   title: string | null
@@ -52,6 +53,7 @@ export type IndexedDocumentMinAggregateOutputType = {
 
 export type IndexedDocumentMaxAggregateOutputType = {
   id: string | null
+  tenantId: string | null
   source: string | null
   sourceType: $Enums.SourceType | null
   title: string | null
@@ -68,6 +70,7 @@ export type IndexedDocumentMaxAggregateOutputType = {
 
 export type IndexedDocumentCountAggregateOutputType = {
   id: number
+  tenantId: number
   source: number
   sourceType: number
   title: number
@@ -94,6 +97,7 @@ export type IndexedDocumentSumAggregateInputType = {
 
 export type IndexedDocumentMinAggregateInputType = {
   id?: true
+  tenantId?: true
   source?: true
   sourceType?: true
   title?: true
@@ -110,6 +114,7 @@ export type IndexedDocumentMinAggregateInputType = {
 
 export type IndexedDocumentMaxAggregateInputType = {
   id?: true
+  tenantId?: true
   source?: true
   sourceType?: true
   title?: true
@@ -126,6 +131,7 @@ export type IndexedDocumentMaxAggregateInputType = {
 
 export type IndexedDocumentCountAggregateInputType = {
   id?: true
+  tenantId?: true
   source?: true
   sourceType?: true
   title?: true
@@ -229,6 +235,7 @@ export type IndexedDocumentGroupByArgs<ExtArgs extends runtime.Types.Extensions.
 
 export type IndexedDocumentGroupByOutputType = {
   id: string
+  tenantId: string
   source: string
   sourceType: $Enums.SourceType
   title: string | null
@@ -268,6 +275,7 @@ export type IndexedDocumentWhereInput = {
   OR?: Prisma.IndexedDocumentWhereInput[]
   NOT?: Prisma.IndexedDocumentWhereInput | Prisma.IndexedDocumentWhereInput[]
   id?: Prisma.UuidFilter<"IndexedDocument"> | string
+  tenantId?: Prisma.StringFilter<"IndexedDocument"> | string
   source?: Prisma.StringFilter<"IndexedDocument"> | string
   sourceType?: Prisma.EnumSourceTypeFilter<"IndexedDocument"> | $Enums.SourceType
   title?: Prisma.StringNullableFilter<"IndexedDocument"> | string | null
@@ -284,6 +292,7 @@ export type IndexedDocumentWhereInput = {
 
 export type IndexedDocumentOrderByWithRelationInput = {
   id?: Prisma.SortOrder
+  tenantId?: Prisma.SortOrder
   source?: Prisma.SortOrder
   sourceType?: Prisma.SortOrder
   title?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -300,10 +309,11 @@ export type IndexedDocumentOrderByWithRelationInput = {
 
 export type IndexedDocumentWhereUniqueInput = Prisma.AtLeast<{
   id?: string
-  source_sourceType?: Prisma.IndexedDocumentSourceSourceTypeCompoundUniqueInput
+  tenantId_source_sourceType?: Prisma.IndexedDocumentTenantIdSourceSourceTypeCompoundUniqueInput
   AND?: Prisma.IndexedDocumentWhereInput | Prisma.IndexedDocumentWhereInput[]
   OR?: Prisma.IndexedDocumentWhereInput[]
   NOT?: Prisma.IndexedDocumentWhereInput | Prisma.IndexedDocumentWhereInput[]
+  tenantId?: Prisma.StringFilter<"IndexedDocument"> | string
   source?: Prisma.StringFilter<"IndexedDocument"> | string
   sourceType?: Prisma.EnumSourceTypeFilter<"IndexedDocument"> | $Enums.SourceType
   title?: Prisma.StringNullableFilter<"IndexedDocument"> | string | null
@@ -316,10 +326,11 @@ export type IndexedDocumentWhereUniqueInput = Prisma.AtLeast<{
   indexedAt?: Prisma.DateTimeNullableFilter<"IndexedDocument"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"IndexedDocument"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"IndexedDocument"> | Date | string
-}, "id" | "source_sourceType">
+}, "id" | "tenantId_source_sourceType">
 
 export type IndexedDocumentOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
+  tenantId?: Prisma.SortOrder
   source?: Prisma.SortOrder
   sourceType?: Prisma.SortOrder
   title?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -344,6 +355,7 @@ export type IndexedDocumentScalarWhereWithAggregatesInput = {
   OR?: Prisma.IndexedDocumentScalarWhereWithAggregatesInput[]
   NOT?: Prisma.IndexedDocumentScalarWhereWithAggregatesInput | Prisma.IndexedDocumentScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"IndexedDocument"> | string
+  tenantId?: Prisma.StringWithAggregatesFilter<"IndexedDocument"> | string
   source?: Prisma.StringWithAggregatesFilter<"IndexedDocument"> | string
   sourceType?: Prisma.EnumSourceTypeWithAggregatesFilter<"IndexedDocument"> | $Enums.SourceType
   title?: Prisma.StringNullableWithAggregatesFilter<"IndexedDocument"> | string | null
@@ -360,6 +372,7 @@ export type IndexedDocumentScalarWhereWithAggregatesInput = {
 
 export type IndexedDocumentCreateInput = {
   id?: string
+  tenantId: string
   source: string
   sourceType: $Enums.SourceType
   title?: string | null
@@ -376,6 +389,7 @@ export type IndexedDocumentCreateInput = {
 
 export type IndexedDocumentUncheckedCreateInput = {
   id?: string
+  tenantId: string
   source: string
   sourceType: $Enums.SourceType
   title?: string | null
@@ -392,6 +406,7 @@ export type IndexedDocumentUncheckedCreateInput = {
 
 export type IndexedDocumentUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  tenantId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
   sourceType?: Prisma.EnumSourceTypeFieldUpdateOperationsInput | $Enums.SourceType
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -408,6 +423,7 @@ export type IndexedDocumentUpdateInput = {
 
 export type IndexedDocumentUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  tenantId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
   sourceType?: Prisma.EnumSourceTypeFieldUpdateOperationsInput | $Enums.SourceType
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -424,6 +440,7 @@ export type IndexedDocumentUncheckedUpdateInput = {
 
 export type IndexedDocumentCreateManyInput = {
   id?: string
+  tenantId: string
   source: string
   sourceType: $Enums.SourceType
   title?: string | null
@@ -440,6 +457,7 @@ export type IndexedDocumentCreateManyInput = {
 
 export type IndexedDocumentUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  tenantId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
   sourceType?: Prisma.EnumSourceTypeFieldUpdateOperationsInput | $Enums.SourceType
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -456,6 +474,7 @@ export type IndexedDocumentUpdateManyMutationInput = {
 
 export type IndexedDocumentUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  tenantId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
   sourceType?: Prisma.EnumSourceTypeFieldUpdateOperationsInput | $Enums.SourceType
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -470,13 +489,15 @@ export type IndexedDocumentUncheckedUpdateManyInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
-export type IndexedDocumentSourceSourceTypeCompoundUniqueInput = {
+export type IndexedDocumentTenantIdSourceSourceTypeCompoundUniqueInput = {
+  tenantId: string
   source: string
   sourceType: $Enums.SourceType
 }
 
 export type IndexedDocumentCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
+  tenantId?: Prisma.SortOrder
   source?: Prisma.SortOrder
   sourceType?: Prisma.SortOrder
   title?: Prisma.SortOrder
@@ -497,6 +518,7 @@ export type IndexedDocumentAvgOrderByAggregateInput = {
 
 export type IndexedDocumentMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
+  tenantId?: Prisma.SortOrder
   source?: Prisma.SortOrder
   sourceType?: Prisma.SortOrder
   title?: Prisma.SortOrder
@@ -513,6 +535,7 @@ export type IndexedDocumentMaxOrderByAggregateInput = {
 
 export type IndexedDocumentMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
+  tenantId?: Prisma.SortOrder
   source?: Prisma.SortOrder
   sourceType?: Prisma.SortOrder
   title?: Prisma.SortOrder
@@ -559,6 +582,7 @@ export type NullableDateTimeFieldUpdateOperationsInput = {
 
 export type IndexedDocumentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
+  tenantId?: boolean
   source?: boolean
   sourceType?: boolean
   title?: boolean
@@ -575,6 +599,7 @@ export type IndexedDocumentSelect<ExtArgs extends runtime.Types.Extensions.Inter
 
 export type IndexedDocumentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
+  tenantId?: boolean
   source?: boolean
   sourceType?: boolean
   title?: boolean
@@ -591,6 +616,7 @@ export type IndexedDocumentSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
 
 export type IndexedDocumentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
+  tenantId?: boolean
   source?: boolean
   sourceType?: boolean
   title?: boolean
@@ -607,6 +633,7 @@ export type IndexedDocumentSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
 
 export type IndexedDocumentSelectScalar = {
   id?: boolean
+  tenantId?: boolean
   source?: boolean
   sourceType?: boolean
   title?: boolean
@@ -621,13 +648,14 @@ export type IndexedDocumentSelectScalar = {
   updatedAt?: boolean
 }
 
-export type IndexedDocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "source" | "sourceType" | "title" | "status" | "errorMessage" | "chunkCount" | "contentHash" | "s3Key" | "autoReindex" | "indexedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["indexedDocument"]>
+export type IndexedDocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tenantId" | "source" | "sourceType" | "title" | "status" | "errorMessage" | "chunkCount" | "contentHash" | "s3Key" | "autoReindex" | "indexedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["indexedDocument"]>
 
 export type $IndexedDocumentPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "IndexedDocument"
   objects: {}
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
+    tenantId: string
     source: string
     sourceType: $Enums.SourceType
     title: string | null
@@ -1064,6 +1092,7 @@ export interface Prisma__IndexedDocumentClient<T, Null = never, ExtArgs extends 
  */
 export interface IndexedDocumentFieldRefs {
   readonly id: Prisma.FieldRef<"IndexedDocument", 'String'>
+  readonly tenantId: Prisma.FieldRef<"IndexedDocument", 'String'>
   readonly source: Prisma.FieldRef<"IndexedDocument", 'String'>
   readonly sourceType: Prisma.FieldRef<"IndexedDocument", 'SourceType'>
   readonly title: Prisma.FieldRef<"IndexedDocument", 'String'>

@@ -1,5 +1,5 @@
 import { Agent } from "@mastra/core/agent";
-import { getAppConfig } from "../lib/config";
+import { getConfigFromContext } from "../lib/tenant-context";
 
 export const translatorAgent = new Agent({
   id: "translator-agent",
@@ -13,5 +13,6 @@ Rules:
 - If the text is already in Spanish, return it exactly as received.
 - Do not summarize or alter the meaning of the content.
   `.trim(),
-  model: async () => (await getAppConfig()).llmModelSmall,
+  model: async ({ requestContext }) =>
+    (await getConfigFromContext(requestContext)).llmModelSmall,
 });

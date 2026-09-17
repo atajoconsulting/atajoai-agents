@@ -19,9 +19,19 @@ export * as $Enums from './enums'
 export * from './enums';
 /**
  * Model AppConfig
- * 
+ * AppConfig is keyed by tenant (each Chatwoot AgentBot = one tenant).
+ * Stores per-tenant org identity, behavior, handoff, and the Chatwoot API
+ * token.  Model and retrieval config live in GlobalConfig (shared by all
+ * tenants); the fields are kept here as nullable so a per-tenant override
+ * can be added in the future without a schema change.
  */
 export type AppConfig = Prisma.AppConfigModel
+/**
+ * Model GlobalConfig
+ * Global configuration shared by all tenants. Stores the instance-wide
+ * model and retrieval defaults that Super Admin configures.
+ */
+export type GlobalConfig = Prisma.GlobalConfigModel
 /**
  * Model IndexedDocument
  * 

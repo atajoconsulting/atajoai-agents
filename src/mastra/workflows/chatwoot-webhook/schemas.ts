@@ -141,6 +141,9 @@ export const conversationSchema = z
 
 export const chatwootWebhookSchema = z
   .object({
+    /** Mastra tenant id (== AgentBot.bot_config.tenant_id) injected by the
+     *  route handler from the URL path. */
+    tenantId: z.string().min(1).optional(),
     event: z.string(),
     id: z.number().optional(),
     content: z.string().nullable().optional(),
@@ -160,6 +163,7 @@ export const chatwootWebhookSchema = z
 
 export const validationResultSchema = z.object({
   shouldProcess: z.boolean(),
+  tenantId: z.string().min(1),
   accountId: z.number(),
   conversationId: z.number(),
   messageContent: z.string(),

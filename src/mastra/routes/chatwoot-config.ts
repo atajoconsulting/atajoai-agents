@@ -2,7 +2,6 @@ import { registerApiRoute } from "@mastra/core/server";
 import { z } from "zod";
 import type { Prisma } from "../../generated/prisma/client";
 import {
-  DEFAULT_APP_CONFIG_ID,
   getAppConfig,
   getChatwootApiToken,
   invalidateAppConfigCache,
@@ -40,16 +39,9 @@ const configPatchSchema = z
     orgEOffice: z.url().nullable().optional(),
     preferredLang: nullableTrimmedString,
     responseStyle: responseStyleSchema,
-    llmModel: nullableTrimmedString,
-    llmModelMedium: nullableTrimmedString,
-    llmModelSmall: nullableTrimmedString,
-    embedModel: nullableTrimmedString,
-    retrievalTopK: nullablePositiveNumber,
-    retrievalFinalK: nullablePositiveNumber,
     customInstructions: nullableTrimmedString,
     greetingMessage: nullableTrimmedString,
     outOfScopeMessage: nullableTrimmedString,
-    chatwootBaseUrl: z.url().nullable().optional(),
     chatwootApiToken: nullableTrimmedString,
     enableHandoff: z.boolean().optional(),
     handoffTeamId: nullablePositiveInt,
@@ -67,17 +59,9 @@ const serializedConfigSchema = z.object({
   orgEOffice: z.string(),
   preferredLang: z.string(),
   responseStyle: z.enum(["brief_structured", "brief_plain"]),
-  llmModel: z.string(),
-  llmModelMedium: z.string(),
-  llmModelSmall: z.string(),
-  embedModel: z.string(),
-  retrievalTopK: z.number().int().positive(),
-  retrievalFinalK: z.number().int().positive(),
   customInstructions: z.string().nullable(),
   greetingMessage: z.string().nullable(),
   outOfScopeMessage: z.string().nullable(),
-  chatwootBaseUrl: z.string().nullable(),
-  chatwootApiToken: z.string().nullable(),
   enableHandoff: z.boolean(),
   handoffTeamId: z.number().int().positive().nullable(),
   handoffAssigneeId: z.number().int().positive().nullable(),
@@ -96,11 +80,19 @@ function openApiSchema(schema: z.ZodTypeAny) {
 }
 
 export const chatwootConfigRoutes = [
-  registerApiRoute("/chatwoot/config", {
+  registerApiRoute("/chatwoot/:tenantId/config", {
     method: "GET",
     openapi: {
-      summary: "Get Chatwoot runtime configuration",
+      summary: "Get Chatwoot runtime configuration for a tenant",
       tags: ["Chatwoot Config"],
+      parameters: [
+        {
+          in: "path",
+          name: "tenantId",
+          required: true,
+          schema: { type: "string" },
+        },
+      ],
       responses: {
         200: {
           description: "Current runtime configuration",
@@ -113,20 +105,32 @@ export const chatwootConfigRoutes = [
       },
     },
     handler: async (c) => {
+      const tenantId = c.req.param("tenantId");
       const logger = c.get("mastra").getLogger();
-      const [config, apiToken] = await Promise.all([getAppConfig(), getChatwootApiToken()]);
-      logger.debug("Config fetched");
+      const [config, apiToken] = await Promise.all([
+        getAppConfig(tenantId),
+        getChatwootApiToken(tenantId),
+      ]);
+      logger.debug("Config fetched", { tenantId });
       return c.json({
         ...serializeAppConfig(config),
         chatwootApiToken: apiToken ?? null,
       }, 200);
     },
   }),
-  registerApiRoute("/chatwoot/config", {
+  registerApiRoute("/chatwoot/:tenantId/config", {
     method: "PATCH",
     openapi: {
-      summary: "Update Chatwoot runtime configuration",
+      summary: "Create or update Chatwoot runtime configuration for a tenant",
       tags: ["Chatwoot Config"],
+      parameters: [
+        {
+          in: "path",
+          name: "tenantId",
+          required: true,
+          schema: { type: "string" },
+        },
+      ],
       requestBody: {
         required: true,
         content: {
@@ -150,29 +154,18 @@ export const chatwootConfigRoutes = [
       },
     },
     handler: async (c) => {
+      const tenantId = c.req.param("tenantId");
       const logger = c.get("mastra").getLogger();
       const body = await c.req.json().catch(() => null);
       const parsed = configPatchSchema.safeParse(body);
 
       if (!parsed.success) {
-        logger.debug("Config PATCH rejected: invalid payload");
+        logger.debug("Config PATCH rejected: invalid payload", { tenantId });
         return c.json(badRequest("Invalid configuration payload", parsed.error.flatten()), 400);
       }
 
-      const current = await getAppConfig();
-      const nextTopK = parsed.data.retrievalTopK ?? current.retrievalTopK;
-      const nextFinalK = parsed.data.retrievalFinalK ?? current.retrievalFinalK;
-
-      if (nextFinalK > nextTopK) {
-        logger.debug("Config PATCH rejected: retrievalFinalK > retrievalTopK");
-        return c.json(
-          badRequest("retrievalFinalK cannot be greater than retrievalTopK"),
-          400,
-        );
-      }
-
       const createData: Prisma.AppConfigUncheckedCreateInput = {
-        id: DEFAULT_APP_CONFIG_ID,
+        id: tenantId,
       };
       const updateData: Prisma.AppConfigUncheckedUpdateInput = {};
       const assign = (
@@ -191,23 +184,24 @@ export const chatwootConfigRoutes = [
         assign(key as Exclude<keyof Prisma.AppConfigUncheckedCreateInput, "id">, stored);
       }
 
+      // Idempotent: creates the tenant row on first call, updates on subsequent.
       await prisma.appConfig.upsert({
-        where: { id: DEFAULT_APP_CONFIG_ID },
+        where: { id: tenantId },
         create: createData,
         update: updateData,
       });
 
       const hasTokenChange = "chatwootApiToken" in parsed.data;
       await Promise.all([
-        invalidateAppConfigCache(),
-        hasTokenChange ? invalidateChatwootApiTokenCache() : Promise.resolve(),
+        invalidateAppConfigCache(tenantId),
+        hasTokenChange ? invalidateChatwootApiTokenCache(tenantId) : Promise.resolve(),
       ]);
       const [updatedConfig, updatedToken] = await Promise.all([
-        getAppConfig({ forceRefresh: true }),
-        getChatwootApiToken(),
+        getAppConfig(tenantId, { forceRefresh: true }),
+        getChatwootApiToken(tenantId),
       ]);
       const changedKeys = Object.keys(parsed.data);
-      logger.debug(`Config updated: ${changedKeys.join(", ")}`);
+      logger.debug(`Config updated: ${changedKeys.join(", ")}`, { tenantId });
       return c.json({
         ...serializeAppConfig(updatedConfig),
         chatwootApiToken: updatedToken ?? null,

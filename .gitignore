@@ -10,3 +10,8 @@ dist
 .vercel
 .idea
 /.pnpm-store/
+
+# Local tooling and OS cruft
+.DS_Store
+.atl/
+.claude/settings.local.json

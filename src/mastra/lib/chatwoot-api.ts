@@ -1,9 +1,11 @@
 import { getAppConfig, getChatwootApiToken } from "./config";
 import { withRetry, RetryableError } from "./retry";
+import { env } from "../env";
 
 export interface SendMessageParams {
   accountId: number;
   conversationId: number;
+  tenantId: string;
   content: string;
   messageType?: "outgoing" | "template";
   private?: boolean;
@@ -20,6 +22,7 @@ export interface SendMessageResult {
 export interface AssignConversationParams {
   accountId: number;
   conversationId: number;
+  tenantId: string;
   assigneeId?: number;
   teamId?: number;
 }
@@ -34,15 +37,17 @@ export interface AssignConversationResult {
 async function chatwootRequest<T>(
   path: string,
   options: RequestInit,
+  tenantId: string,
 ): Promise<T> {
-  const [config, apiToken] = await Promise.all([getAppConfig(), getChatwootApiToken()]);
-  if (!config.chatwootBaseUrl || !apiToken) {
+  const apiToken = await getChatwootApiToken(tenantId);
+  const chatwootBaseUrl = env.CHATWOOT_BASE_URL;
+  if (!chatwootBaseUrl || !apiToken) {
     throw new Error(
-      "Chatwoot API is not configured. Set chatwootBaseUrl and chatwootApiToken in app config.",
+      "Chatwoot API is not configured. Set CHATWOOT_BASE_URL in env and chatwootApiToken in the tenant's app config.",
     );
   }
 
-  const baseUrl = config.chatwootBaseUrl.replace(/\/$/, "");
+  const baseUrl = chatwootBaseUrl.replace(/\/$/, "");
   const url = `${baseUrl}${path}`;
 
   return withRetry(
@@ -88,6 +93,7 @@ export async function sendChatwootMessage(
         private: params.private ?? false,
       }),
     },
+    params.tenantId,
   );
 }
 
@@ -109,5 +115,6 @@ export async function assignChatwootConversation(
         ...(params.teamId ? { team_id: params.teamId } : {}),
       }),
     },
+    params.tenantId,
   );
 }

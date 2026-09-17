@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Mastra } from "@mastra/core/mastra";
 import { ModelRouterEmbeddingModel } from "@mastra/core/llm";
+import { RequestContext } from "@mastra/core/request-context";
 import type { SourceType } from "../../generated/prisma/client";
 import { extractDocxText } from "./document-extractor/docx-extractor";
 import { extractPdfText } from "./document-extractor/pdf-extractor";
@@ -41,8 +42,8 @@ function getLogger(mastra: Mastra) {
   return mastra.getLogger();
 }
 
-async function getRuntimeIndexerDependencies(mastra: Mastra) {
-  const config = await getAppConfig();
+async function getRuntimeIndexerDependencies(mastra: Mastra, tenantId: string) {
+  const config = await getAppConfig(tenantId);
   const vectorStore = mastra.getVector("qdrant");
   const translator = mastra.getAgent("translatorAgent");
 
@@ -230,6 +231,17 @@ async function runIndexJob(
   const logger = getLogger(mastra);
 
   try {
+    // Look up the tenant before any work — every Qdrant point we write
+    // must carry it.
+    const existing = await prisma.indexedDocument.findUnique({
+      where: { id: documentId },
+      select: { tenantId: true },
+    });
+    if (!existing) {
+      throw new Error(`IndexedDocument ${documentId} not found`);
+    }
+    const tenantId = existing.tenantId;
+
     await updateIndexedDocument(documentId, {
       status: "indexing",
       errorMessage: null,
@@ -238,18 +250,26 @@ async function runIndexJob(
     });
 
     const { vectorStore, embedModel, embedModelName, translator } =
-      await getRuntimeIndexerDependencies(mastra);
+      await getRuntimeIndexerDependencies(mastra, tenantId);
     const builtDocument = await builder();
 
     // Vectors use deterministic UUIDv5 IDs (doc.id + chunkIndex), so upsert
     // naturally overwrites existing chunks. We only need to clean up orphan
     // chunks from a previous run that had more chunks than the current one.
+    // Background jobs don't have a real request context. Create a minimal
+    // one with just the tenantId so the translator agent can resolve the
+    // tenant's model selection.
+    const requestContext = new RequestContext();
+    requestContext.set("tenantId", tenantId);
+
     const result = await indexDocuments([builtDocument.ragDocument], {
       vectorStore,
       embedModel,
       embedModelName,
       translator,
       logger,
+      tenantId,
+      requestContext,
     });
 
     if (result.indexed !== 1 || result.errors > 0) {
@@ -264,8 +284,15 @@ async function runIndexJob(
       await vectorStore.deleteVectors({
         indexName: env.QDRANT_COLLECTION,
         filter: {
-          documentId,
-          contentHash: { $ne: builtDocument.contentHash },
+          must: [
+            { key: "documentId", match: { value: documentId } },
+            { key: "tenantId", match: { value: tenantId } },
+          ],
+          // "not equal" is expressed via must_not in Qdrant's native filter
+          // syntax (match has no $ne operator).
+          must_not: [
+            { key: "contentHash", match: { value: builtDocument.contentHash } },
+          ],
         },
       });
     }

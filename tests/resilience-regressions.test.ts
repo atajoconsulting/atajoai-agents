@@ -30,7 +30,7 @@ const { withRetry } = await import("../src/mastra/lib/retry.ts");
 
 function createResolvedConfig(overrides: Record<string, unknown> = {}) {
   return {
-    id: "default",
+    id: "test-tenant",
     orgName: "Ayuntamiento de Prueba",
     orgPhone: "010",
     orgSchedule: "lunes a viernes",
@@ -49,8 +49,6 @@ function createResolvedConfig(overrides: Record<string, unknown> = {}) {
     customInstructions: null,
     greetingMessage: null,
     outOfScopeMessage: null,
-    chatwootBaseUrl: "https://chatwoot.test",
-    chatwootApiToken: "token",
     enableHandoff: true,
     handoffTeamId: null,
     handoffAssigneeId: 42,
@@ -121,6 +119,7 @@ test("launchChatwootWorkflowRun releases the semaphore if createRun fails", asyn
           };
         },
       },
+      tenantId: "test-tenant",
       semaphore: {
         release() {
           releases += 1;
@@ -158,6 +157,7 @@ test("launchChatwootWorkflowRun releases once after async run failure", async ()
         };
       },
     },
+    tenantId: "test-tenant",
     semaphore: {
       release() {
         releases += 1;
@@ -250,10 +250,11 @@ test("performChatwootHandoff degrades only when assignment fails", async () => {
   assert.equal(noteAttempts, 0);
 });
 
-test("buildEvidenceQuery filters strictly by the active embedModel", () => {
+test("buildEvidenceQuery filters by embedModel and tenantId", () => {
   const query = buildEvidenceQuery("documents", [0.25, 0.75], {
     embedModel: "embed-v2",
     retrievalTopK: 8,
+    tenantId: "tenant-abc",
   });
 
   assert.deepEqual(query, {
@@ -261,9 +262,10 @@ test("buildEvidenceQuery filters strictly by the active embedModel", () => {
     queryVector: [0.25, 0.75],
     topK: 8,
     filter: {
-      embedModel: {
-        $eq: "embed-v2",
-      },
+      must: [
+        { key: "embedModel", match: { value: "embed-v2" } },
+        { key: "tenantId", match: { value: "tenant-abc" } },
+      ],
     },
   });
 });

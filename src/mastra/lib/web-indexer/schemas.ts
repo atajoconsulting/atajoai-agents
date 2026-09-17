@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const webIndexerInputSchema = z.object({
+  tenantId: z.string().min(1),
   urls: z.array(z.string()),
 });
 
@@ -19,6 +20,7 @@ export const crawledPageSchema = z.object({
 });
 
 export const webIndexerOutputSchema = z.object({
+  tenantId: z.string().min(1),
   crawledPages: z.array(crawledPageSchema),
 });
 
