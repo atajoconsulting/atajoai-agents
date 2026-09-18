@@ -15,7 +15,7 @@ export const judgeAnswerability = createStep({
     "Determines whether the retrieved evidence is sufficient to answer safely",
   inputSchema: retrievedResultSchema,
   outputSchema: judgedResultSchema,
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData, mastra, requestContext }) => {
     const t0 = Date.now();
     const logger = mastra?.getLogger();
 
@@ -63,6 +63,7 @@ export const judgeAnswerability = createStep({
         structuredOutput: {
           schema: judgeAnswerabilityResultSchema,
         },
+        requestContext,
       },
     );
 

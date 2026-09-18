@@ -3,6 +3,7 @@ import type { ResolvedAppConfig } from "./config";
 export interface AssignConversationInput {
   accountId: number;
   conversationId: number;
+  tenantId?: string;
   assigneeId?: number;
   teamId?: number;
 }
@@ -10,6 +11,7 @@ export interface AssignConversationInput {
 export interface SendPrivateNoteInput {
   accountId: number;
   conversationId: number;
+  tenantId?: string;
   content: string;
   private: boolean;
 }

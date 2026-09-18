@@ -1,0 +1,45 @@
+# Local development stack: the services Mastra needs to run, nothing else.
+# Mastra itself runs on the host with `pnpm dev`.
+#
+# Ports are shifted off the defaults so this can run next to other projects
+# that already bind 5432/6333/6334.
+
+name: atajoai-agents-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mastra_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - agents_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.0
+    ports:
+      - "6335:6333"
+    volumes:
+      - agents_qdrant:/qdrant/storage
+
+volumes:
+  agents_pg:
+  agents_qdrant:

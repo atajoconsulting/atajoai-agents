@@ -29,6 +29,11 @@ async function ensureQdrantSetup(): Promise<void> {
     }),
     qdrantVector.createPayloadIndex({
       indexName: env.QDRANT_COLLECTION,
+      fieldName: "tenantId",
+      fieldSchema: "keyword",
+    }),
+    qdrantVector.createPayloadIndex({
+      indexName: env.QDRANT_COLLECTION,
       fieldName: "contentHash",
       fieldSchema: "keyword",
     }),

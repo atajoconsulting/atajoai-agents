@@ -9,7 +9,7 @@ export const routeMessage = createStep({
   description: "Classifies the incoming message and rewrites the search query if retrieval is needed",
   inputSchema: validationResultSchema,
   outputSchema: routedResultSchema,
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData, mastra, requestContext }) => {
     const t0 = Date.now();
     const logger = mastra?.getLogger();
 
@@ -46,6 +46,7 @@ export const routeMessage = createStep({
         structuredOutput: {
           schema: routeMessageResultSchema,
         },
+        requestContext,
       },
     );
 
@@ -72,6 +73,7 @@ export const routeMessage = createStep({
           memory: memoryOptions,
           abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
           modelSettings: { temperature: 0, maxOutputTokens: 100 },
+          requestContext,
         },
       );
       searchQuery = rewriteResponse.text.trim() || inputData.messageContent;

@@ -12,6 +12,7 @@ const fileInputSchema = z.object({
 });
 
 export const documentIndexerInputSchema = z.object({
+  tenantId: z.string().min(1),
   files: z.array(fileInputSchema),
 });
 

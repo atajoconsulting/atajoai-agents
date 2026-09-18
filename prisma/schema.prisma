@@ -8,8 +8,12 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
+/// AppConfig is keyed by tenant (each Chatwoot AgentBot = one tenant).
+/// Stores per-tenant org identity, behavior, handoff, and the Chatwoot API
+/// token. Model fields are nullable and fall back to the GlobalConfig
+/// defaults when unset (per-agent model override).
 model AppConfig {
-  id                 String   @id @default("default")
+  id                 String   @id
   orgName            String?
   orgPhone           String?
   orgSchedule        String?
@@ -18,23 +22,34 @@ model AppConfig {
   orgEOffice         String?
   preferredLang      String?
   responseStyle      String?
-  llmModel           String?
-  llmModelMedium     String?
-  llmModelSmall      String?
-  embedModel         String?
-  retrievalTopK      Int?
-  retrievalFinalK    Int?
   customInstructions String?
   greetingMessage    String?
   outOfScopeMessage  String?
-  chatwootBaseUrl    String?
   chatwootApiToken   String?
   enableHandoff      Boolean?
   handoffTeamId      String?
   handoffAssigneeId  String?
+  llmModel           String?
+  llmModelSmall      String?
+  embedModel         String?
   updatedAt          DateTime @default(now()) @updatedAt
 
   @@map("app_config")
+  @@schema("app")
+}
+
+/// Global configuration shared by all tenants. Stores the instance-wide
+/// model and retrieval defaults that Super Admin configures.
+model GlobalConfig {
+  id              String   @id @default("default")
+  llmModel        String?
+  llmModelSmall   String?
+  embedModel      String?
+  retrievalTopK   Int?
+  retrievalFinalK Int?
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  @@map("global_config")
   @@schema("app")
 }
 
@@ -59,6 +74,7 @@ enum SourceType {
 
 model IndexedDocument {
   id           String         @id @default(uuid()) @db.Uuid
+  tenantId     String
   source       String
   sourceType   SourceType
   title        String?
@@ -72,7 +88,8 @@ model IndexedDocument {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @default(now()) @updatedAt
 
-  @@unique([source, sourceType])
+  @@unique([tenantId, source, sourceType])
+  @@index([tenantId])
   @@index([status])
   @@index([createdAt])
   @@map("indexed_documents")

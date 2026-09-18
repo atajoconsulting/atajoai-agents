@@ -385,6 +385,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   AppConfig: 'AppConfig',
+  GlobalConfig: 'GlobalConfig',
   IndexedDocument: 'IndexedDocument'
 } as const
 
@@ -401,7 +402,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "appConfig" | "indexedDocument"
+    modelProps: "appConfig" | "globalConfig" | "indexedDocument"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -476,6 +477,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.AppConfigCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.AppConfigCountAggregateOutputType> | number
+        }
+      }
+    }
+    GlobalConfig: {
+      payload: Prisma.$GlobalConfigPayload<ExtArgs>
+      fields: Prisma.GlobalConfigFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.GlobalConfigFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GlobalConfigPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.GlobalConfigFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GlobalConfigPayload>
+        }
+        findFirst: {
+          args: Prisma.GlobalConfigFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GlobalConfigPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.GlobalConfigFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GlobalConfigPayload>
+        }
+        findMany: {
+          args: Prisma.GlobalConfigFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GlobalConfigPayload>[]
+        }
+        create: {
+          args: Prisma.GlobalConfigCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GlobalConfigPayload>
+        }
+        createMany: {
+          args: Prisma.GlobalConfigCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.GlobalConfigCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GlobalConfigPayload>[]
+        }
+        delete: {
+          args: Prisma.GlobalConfigDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GlobalConfigPayload>
+        }
+        update: {
+          args: Prisma.GlobalConfigUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GlobalConfigPayload>
+        }
+        deleteMany: {
+          args: Prisma.GlobalConfigDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.GlobalConfigUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.GlobalConfigUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GlobalConfigPayload>[]
+        }
+        upsert: {
+          args: Prisma.GlobalConfigUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GlobalConfigPayload>
+        }
+        aggregate: {
+          args: Prisma.GlobalConfigAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateGlobalConfig>
+        }
+        groupBy: {
+          args: Prisma.GlobalConfigGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GlobalConfigGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.GlobalConfigCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GlobalConfigCountAggregateOutputType> | number
         }
       }
     }
@@ -602,16 +677,9 @@ export const AppConfigScalarFieldEnum = {
   orgEOffice: 'orgEOffice',
   preferredLang: 'preferredLang',
   responseStyle: 'responseStyle',
-  llmModel: 'llmModel',
-  llmModelMedium: 'llmModelMedium',
-  llmModelSmall: 'llmModelSmall',
-  embedModel: 'embedModel',
-  retrievalTopK: 'retrievalTopK',
-  retrievalFinalK: 'retrievalFinalK',
   customInstructions: 'customInstructions',
   greetingMessage: 'greetingMessage',
   outOfScopeMessage: 'outOfScopeMessage',
-  chatwootBaseUrl: 'chatwootBaseUrl',
   chatwootApiToken: 'chatwootApiToken',
   enableHandoff: 'enableHandoff',
   handoffTeamId: 'handoffTeamId',
@@ -622,8 +690,22 @@ export const AppConfigScalarFieldEnum = {
 export type AppConfigScalarFieldEnum = (typeof AppConfigScalarFieldEnum)[keyof typeof AppConfigScalarFieldEnum]
 
 
+export const GlobalConfigScalarFieldEnum = {
+  id: 'id',
+  llmModel: 'llmModel',
+  llmModelSmall: 'llmModelSmall',
+  embedModel: 'embedModel',
+  retrievalTopK: 'retrievalTopK',
+  retrievalFinalK: 'retrievalFinalK',
+  updatedAt: 'updatedAt'
+} as const
+
+export type GlobalConfigScalarFieldEnum = (typeof GlobalConfigScalarFieldEnum)[keyof typeof GlobalConfigScalarFieldEnum]
+
+
 export const IndexedDocumentScalarFieldEnum = {
   id: 'id',
+  tenantId: 'tenantId',
   source: 'source',
   sourceType: 'sourceType',
   title: 'title',
@@ -686,20 +768,6 @@ export type ListStringFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaMod
 
 
 /**
- * Reference to a field of type 'Int'
- */
-export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
-    
-
-
-/**
- * Reference to a field of type 'Int[]'
- */
-export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
-    
-
-
-/**
  * Reference to a field of type 'Boolean'
  */
 export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
@@ -717,6 +785,20 @@ export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel
  * Reference to a field of type 'DateTime[]'
  */
 export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Int'
+ */
+export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+/**
+ * Reference to a field of type 'Int[]'
+ */
+export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
     
 
 
@@ -857,6 +939,7 @@ export type PrismaClientOptions = ({
 }
 export type GlobalOmitConfig = {
   appConfig?: Prisma.AppConfigOmit
+  globalConfig?: Prisma.GlobalConfigOmit
   indexedDocument?: Prisma.IndexedDocumentOmit
 }
 

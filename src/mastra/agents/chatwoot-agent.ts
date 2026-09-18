@@ -2,7 +2,7 @@ import { Agent } from "@mastra/core/agent";
 import type { MastraMemory } from "@mastra/core/memory";
 import { Memory } from "@mastra/memory";
 import { getOutboundStyleInstructions } from "../lib/outbound";
-import { getAppConfig } from "../lib/config";
+import { getConfigFromContext } from "../lib/tenant-context";
 import { CitizenChannelOutputProcessor } from "../processors/citizen-channel-output-processor";
 
 // Shared memory instance — all pipeline agents use the same threadId/resourceId
@@ -23,8 +23,8 @@ export const sharedMemory = new Memory({
 export const chatwootRouterAgent = new Agent({
   id: "chatwoot-router-agent",
   name: "Chatwoot Router Agent",
-  instructions: async () => {
-    const config = await getAppConfig();
+  instructions: async ({ requestContext }) => {
+    const config = await getConfigFromContext(requestContext);
     return `
 Eres un clasificador de consultas para una oficina de información local del ${config.orgName}.
 
@@ -52,7 +52,8 @@ Reglas:
 ${config.customInstructions ? `\nInstrucciones adicionales:\n${config.customInstructions}\n` : ""}
 `;
   },
-  model: async () => (await getAppConfig()).llmModelSmall,
+  model: async ({ requestContext }) =>
+    (await getConfigFromContext(requestContext)).llmModelSmall,
   memory: sharedMemory,
   defaultOptions: {
     modelSettings: {
@@ -64,8 +65,8 @@ ${config.customInstructions ? `\nInstrucciones adicionales:\n${config.customInst
 export const chatwootResponderAgent = new Agent({
   id: "chatwoot-responder-agent",
   name: "Chatwoot Responder Agent",
-  instructions: async () => {
-    const config = await getAppConfig();
+  instructions: async ({ requestContext }) => {
+    const config = await getConfigFromContext(requestContext);
     const currentDatetime = new Date().toLocaleString("es-ES", {
       timeZone: "Europe/Madrid",
     });
@@ -108,7 +109,8 @@ Contexto:
 ${config.customInstructions ? `\nInstrucciones adicionales:\n${config.customInstructions}\n` : ""}
 `;
   },
-  model: async () => (await getAppConfig()).llmModel,
+  model: async ({ requestContext }) =>
+    (await getConfigFromContext(requestContext)).llmModel,
   memory: sharedMemory,
   defaultOptions: {
     modelSettings: {

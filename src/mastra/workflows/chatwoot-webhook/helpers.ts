@@ -123,10 +123,12 @@ export async function retrieveLocalEvidence({
   mastra,
   queryText,
   config,
+  tenantId,
 }: {
   mastra: any;
   queryText: string;
   config: ResolvedAppConfig;
+  tenantId: string;
 }): Promise<z.infer<typeof localEvidenceSchema>[]> {
   const vectorStore = mastra.getVector("qdrant");
   if (!vectorStore) {
@@ -139,7 +141,11 @@ export async function retrieveLocalEvidence({
   const { embeddings } = await embedModel.doEmbed({ values: [queryText] });
   const [queryVector] = embeddings;
   const results = await vectorStore.query(
-    buildEvidenceQuery(env.QDRANT_COLLECTION, queryVector, config),
+    buildEvidenceQuery(env.QDRANT_COLLECTION, queryVector, {
+      embedModel: config.embedModel,
+      retrievalTopK: config.retrievalTopK,
+      tenantId,
+    }),
   );
 
   const deduped = new Map<string, z.infer<typeof localEvidenceSchema>>();

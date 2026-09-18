@@ -1,5 +1,10 @@
+import { RequestContext } from "@mastra/core/request-context";
+
 export interface ChatwootWorkflowRun {
-  start(input: { inputData: unknown }): Promise<unknown>;
+  start(input: {
+    inputData: unknown;
+    requestContext?: RequestContext;
+  }): Promise<unknown>;
 }
 
 export interface ChatwootWorkflow {
@@ -23,6 +28,9 @@ export interface LaunchChatwootWorkflowParams {
   body: unknown;
   logger: ChatwootWorkflowLogger;
   mastra: ChatwootWorkflowRegistry;
+  /** Tenant id injected into the run's request context so that every
+   *  downstream agent picks up the correct per-tenant config. */
+  tenantId: string;
   onRunError?: (error: unknown) => Promise<void> | void;
   semaphore?: SemaphoreReleaser;
 }
@@ -31,6 +39,7 @@ export async function launchChatwootWorkflowRun({
   body,
   logger,
   mastra,
+  tenantId,
   onRunError,
   semaphore,
 }: LaunchChatwootWorkflowParams): Promise<void> {
@@ -42,17 +51,20 @@ export async function launchChatwootWorkflowRun({
       throw new Error("Chatwoot webhook workflow not found");
     }
 
+    const requestContext = new RequestContext();
+    requestContext.set("tenantId", tenantId);
+
     const run = await workflow.createRun();
-    const runPromise = run.start({ inputData: body });
+    const runPromise = run.start({ inputData: body, requestContext });
     releaseAttachedToRun = true;
 
     void runPromise
       .then(() => {
-        logger.info("Workflow completed");
+        logger.info("Workflow completed", { tenantId });
       })
       .catch(async (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
-        logger.error("Workflow error", { error: msg });
+        logger.error("Workflow error", { error: msg, tenantId });
         await onRunError?.(error);
       })
       .finally(() => {

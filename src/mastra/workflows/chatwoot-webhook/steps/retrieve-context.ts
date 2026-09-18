@@ -20,6 +20,7 @@ export const retrieveContext = createStep({
       mastra,
       queryText: inputData.searchQuery,
       config: inputData.config,
+      tenantId: inputData.tenantId,
     });
 
     if (logger) {

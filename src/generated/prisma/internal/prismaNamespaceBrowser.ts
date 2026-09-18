@@ -52,6 +52,7 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   AppConfig: 'AppConfig',
+  GlobalConfig: 'GlobalConfig',
   IndexedDocument: 'IndexedDocument'
 } as const
 
@@ -81,16 +82,9 @@ export const AppConfigScalarFieldEnum = {
   orgEOffice: 'orgEOffice',
   preferredLang: 'preferredLang',
   responseStyle: 'responseStyle',
-  llmModel: 'llmModel',
-  llmModelMedium: 'llmModelMedium',
-  llmModelSmall: 'llmModelSmall',
-  embedModel: 'embedModel',
-  retrievalTopK: 'retrievalTopK',
-  retrievalFinalK: 'retrievalFinalK',
   customInstructions: 'customInstructions',
   greetingMessage: 'greetingMessage',
   outOfScopeMessage: 'outOfScopeMessage',
-  chatwootBaseUrl: 'chatwootBaseUrl',
   chatwootApiToken: 'chatwootApiToken',
   enableHandoff: 'enableHandoff',
   handoffTeamId: 'handoffTeamId',
@@ -101,8 +95,22 @@ export const AppConfigScalarFieldEnum = {
 export type AppConfigScalarFieldEnum = (typeof AppConfigScalarFieldEnum)[keyof typeof AppConfigScalarFieldEnum]
 
 
+export const GlobalConfigScalarFieldEnum = {
+  id: 'id',
+  llmModel: 'llmModel',
+  llmModelSmall: 'llmModelSmall',
+  embedModel: 'embedModel',
+  retrievalTopK: 'retrievalTopK',
+  retrievalFinalK: 'retrievalFinalK',
+  updatedAt: 'updatedAt'
+} as const
+
+export type GlobalConfigScalarFieldEnum = (typeof GlobalConfigScalarFieldEnum)[keyof typeof GlobalConfigScalarFieldEnum]
+
+
 export const IndexedDocumentScalarFieldEnum = {
   id: 'id',
+  tenantId: 'tenantId',
   source: 'source',
   sourceType: 'sourceType',
   title: 'title',

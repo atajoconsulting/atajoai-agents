@@ -14,26 +14,18 @@ import type * as Prisma from "../internal/prismaNamespace"
 
 /**
  * Model AppConfig
- * 
+ * AppConfig is keyed by tenant (each Chatwoot AgentBot = one tenant).
+ * Stores per-tenant org identity, behavior, handoff, and the Chatwoot API
+ * token.  Model and retrieval config live in GlobalConfig (shared by all
+ * tenants); the fields are kept here as nullable so a per-tenant override
+ * can be added in the future without a schema change.
  */
 export type AppConfigModel = runtime.Types.Result.DefaultSelection<Prisma.$AppConfigPayload>
 
 export type AggregateAppConfig = {
   _count: AppConfigCountAggregateOutputType | null
-  _avg: AppConfigAvgAggregateOutputType | null
-  _sum: AppConfigSumAggregateOutputType | null
   _min: AppConfigMinAggregateOutputType | null
   _max: AppConfigMaxAggregateOutputType | null
-}
-
-export type AppConfigAvgAggregateOutputType = {
-  retrievalTopK: number | null
-  retrievalFinalK: number | null
-}
-
-export type AppConfigSumAggregateOutputType = {
-  retrievalTopK: number | null
-  retrievalFinalK: number | null
 }
 
 export type AppConfigMinAggregateOutputType = {
@@ -46,16 +38,9 @@ export type AppConfigMinAggregateOutputType = {
   orgEOffice: string | null
   preferredLang: string | null
   responseStyle: string | null
-  llmModel: string | null
-  llmModelMedium: string | null
-  llmModelSmall: string | null
-  embedModel: string | null
-  retrievalTopK: number | null
-  retrievalFinalK: number | null
   customInstructions: string | null
   greetingMessage: string | null
   outOfScopeMessage: string | null
-  chatwootBaseUrl: string | null
   chatwootApiToken: string | null
   enableHandoff: boolean | null
   handoffTeamId: string | null
@@ -73,16 +58,9 @@ export type AppConfigMaxAggregateOutputType = {
   orgEOffice: string | null
   preferredLang: string | null
   responseStyle: string | null
-  llmModel: string | null
-  llmModelMedium: string | null
-  llmModelSmall: string | null
-  embedModel: string | null
-  retrievalTopK: number | null
-  retrievalFinalK: number | null
   customInstructions: string | null
   greetingMessage: string | null
   outOfScopeMessage: string | null
-  chatwootBaseUrl: string | null
   chatwootApiToken: string | null
   enableHandoff: boolean | null
   handoffTeamId: string | null
@@ -100,16 +78,9 @@ export type AppConfigCountAggregateOutputType = {
   orgEOffice: number
   preferredLang: number
   responseStyle: number
-  llmModel: number
-  llmModelMedium: number
-  llmModelSmall: number
-  embedModel: number
-  retrievalTopK: number
-  retrievalFinalK: number
   customInstructions: number
   greetingMessage: number
   outOfScopeMessage: number
-  chatwootBaseUrl: number
   chatwootApiToken: number
   enableHandoff: number
   handoffTeamId: number
@@ -118,16 +89,6 @@ export type AppConfigCountAggregateOutputType = {
   _all: number
 }
 
-
-export type AppConfigAvgAggregateInputType = {
-  retrievalTopK?: true
-  retrievalFinalK?: true
-}
-
-export type AppConfigSumAggregateInputType = {
-  retrievalTopK?: true
-  retrievalFinalK?: true
-}
 
 export type AppConfigMinAggregateInputType = {
   id?: true
@@ -139,16 +100,9 @@ export type AppConfigMinAggregateInputType = {
   orgEOffice?: true
   preferredLang?: true
   responseStyle?: true
-  llmModel?: true
-  llmModelMedium?: true
-  llmModelSmall?: true
-  embedModel?: true
-  retrievalTopK?: true
-  retrievalFinalK?: true
   customInstructions?: true
   greetingMessage?: true
   outOfScopeMessage?: true
-  chatwootBaseUrl?: true
   chatwootApiToken?: true
   enableHandoff?: true
   handoffTeamId?: true
@@ -166,16 +120,9 @@ export type AppConfigMaxAggregateInputType = {
   orgEOffice?: true
   preferredLang?: true
   responseStyle?: true
-  llmModel?: true
-  llmModelMedium?: true
-  llmModelSmall?: true
-  embedModel?: true
-  retrievalTopK?: true
-  retrievalFinalK?: true
   customInstructions?: true
   greetingMessage?: true
   outOfScopeMessage?: true
-  chatwootBaseUrl?: true
   chatwootApiToken?: true
   enableHandoff?: true
   handoffTeamId?: true
@@ -193,16 +140,9 @@ export type AppConfigCountAggregateInputType = {
   orgEOffice?: true
   preferredLang?: true
   responseStyle?: true
-  llmModel?: true
-  llmModelMedium?: true
-  llmModelSmall?: true
-  embedModel?: true
-  retrievalTopK?: true
-  retrievalFinalK?: true
   customInstructions?: true
   greetingMessage?: true
   outOfScopeMessage?: true
-  chatwootBaseUrl?: true
   chatwootApiToken?: true
   enableHandoff?: true
   handoffTeamId?: true
@@ -249,18 +189,6 @@ export type AppConfigAggregateArgs<ExtArgs extends runtime.Types.Extensions.Inte
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
-   * Select which fields to average
-  **/
-  _avg?: AppConfigAvgAggregateInputType
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   * 
-   * Select which fields to sum
-  **/
-  _sum?: AppConfigSumAggregateInputType
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   * 
    * Select which fields to find the minimum value
   **/
   _min?: AppConfigMinAggregateInputType
@@ -291,8 +219,6 @@ export type AppConfigGroupByArgs<ExtArgs extends runtime.Types.Extensions.Intern
   take?: number
   skip?: number
   _count?: AppConfigCountAggregateInputType | true
-  _avg?: AppConfigAvgAggregateInputType
-  _sum?: AppConfigSumAggregateInputType
   _min?: AppConfigMinAggregateInputType
   _max?: AppConfigMaxAggregateInputType
 }
@@ -307,24 +233,15 @@ export type AppConfigGroupByOutputType = {
   orgEOffice: string | null
   preferredLang: string | null
   responseStyle: string | null
-  llmModel: string | null
-  llmModelMedium: string | null
-  llmModelSmall: string | null
-  embedModel: string | null
-  retrievalTopK: number | null
-  retrievalFinalK: number | null
   customInstructions: string | null
   greetingMessage: string | null
   outOfScopeMessage: string | null
-  chatwootBaseUrl: string | null
   chatwootApiToken: string | null
   enableHandoff: boolean | null
   handoffTeamId: string | null
   handoffAssigneeId: string | null
   updatedAt: Date
   _count: AppConfigCountAggregateOutputType | null
-  _avg: AppConfigAvgAggregateOutputType | null
-  _sum: AppConfigSumAggregateOutputType | null
   _min: AppConfigMinAggregateOutputType | null
   _max: AppConfigMaxAggregateOutputType | null
 }
@@ -357,16 +274,9 @@ export type AppConfigWhereInput = {
   orgEOffice?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   preferredLang?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   responseStyle?: Prisma.StringNullableFilter<"AppConfig"> | string | null
-  llmModel?: Prisma.StringNullableFilter<"AppConfig"> | string | null
-  llmModelMedium?: Prisma.StringNullableFilter<"AppConfig"> | string | null
-  llmModelSmall?: Prisma.StringNullableFilter<"AppConfig"> | string | null
-  embedModel?: Prisma.StringNullableFilter<"AppConfig"> | string | null
-  retrievalTopK?: Prisma.IntNullableFilter<"AppConfig"> | number | null
-  retrievalFinalK?: Prisma.IntNullableFilter<"AppConfig"> | number | null
   customInstructions?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   greetingMessage?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   outOfScopeMessage?: Prisma.StringNullableFilter<"AppConfig"> | string | null
-  chatwootBaseUrl?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   chatwootApiToken?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   enableHandoff?: Prisma.BoolNullableFilter<"AppConfig"> | boolean | null
   handoffTeamId?: Prisma.StringNullableFilter<"AppConfig"> | string | null
@@ -384,16 +294,9 @@ export type AppConfigOrderByWithRelationInput = {
   orgEOffice?: Prisma.SortOrderInput | Prisma.SortOrder
   preferredLang?: Prisma.SortOrderInput | Prisma.SortOrder
   responseStyle?: Prisma.SortOrderInput | Prisma.SortOrder
-  llmModel?: Prisma.SortOrderInput | Prisma.SortOrder
-  llmModelMedium?: Prisma.SortOrderInput | Prisma.SortOrder
-  llmModelSmall?: Prisma.SortOrderInput | Prisma.SortOrder
-  embedModel?: Prisma.SortOrderInput | Prisma.SortOrder
-  retrievalTopK?: Prisma.SortOrderInput | Prisma.SortOrder
-  retrievalFinalK?: Prisma.SortOrderInput | Prisma.SortOrder
   customInstructions?: Prisma.SortOrderInput | Prisma.SortOrder
   greetingMessage?: Prisma.SortOrderInput | Prisma.SortOrder
   outOfScopeMessage?: Prisma.SortOrderInput | Prisma.SortOrder
-  chatwootBaseUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   chatwootApiToken?: Prisma.SortOrderInput | Prisma.SortOrder
   enableHandoff?: Prisma.SortOrderInput | Prisma.SortOrder
   handoffTeamId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -414,16 +317,9 @@ export type AppConfigWhereUniqueInput = Prisma.AtLeast<{
   orgEOffice?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   preferredLang?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   responseStyle?: Prisma.StringNullableFilter<"AppConfig"> | string | null
-  llmModel?: Prisma.StringNullableFilter<"AppConfig"> | string | null
-  llmModelMedium?: Prisma.StringNullableFilter<"AppConfig"> | string | null
-  llmModelSmall?: Prisma.StringNullableFilter<"AppConfig"> | string | null
-  embedModel?: Prisma.StringNullableFilter<"AppConfig"> | string | null
-  retrievalTopK?: Prisma.IntNullableFilter<"AppConfig"> | number | null
-  retrievalFinalK?: Prisma.IntNullableFilter<"AppConfig"> | number | null
   customInstructions?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   greetingMessage?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   outOfScopeMessage?: Prisma.StringNullableFilter<"AppConfig"> | string | null
-  chatwootBaseUrl?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   chatwootApiToken?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   enableHandoff?: Prisma.BoolNullableFilter<"AppConfig"> | boolean | null
   handoffTeamId?: Prisma.StringNullableFilter<"AppConfig"> | string | null
@@ -441,26 +337,17 @@ export type AppConfigOrderByWithAggregationInput = {
   orgEOffice?: Prisma.SortOrderInput | Prisma.SortOrder
   preferredLang?: Prisma.SortOrderInput | Prisma.SortOrder
   responseStyle?: Prisma.SortOrderInput | Prisma.SortOrder
-  llmModel?: Prisma.SortOrderInput | Prisma.SortOrder
-  llmModelMedium?: Prisma.SortOrderInput | Prisma.SortOrder
-  llmModelSmall?: Prisma.SortOrderInput | Prisma.SortOrder
-  embedModel?: Prisma.SortOrderInput | Prisma.SortOrder
-  retrievalTopK?: Prisma.SortOrderInput | Prisma.SortOrder
-  retrievalFinalK?: Prisma.SortOrderInput | Prisma.SortOrder
   customInstructions?: Prisma.SortOrderInput | Prisma.SortOrder
   greetingMessage?: Prisma.SortOrderInput | Prisma.SortOrder
   outOfScopeMessage?: Prisma.SortOrderInput | Prisma.SortOrder
-  chatwootBaseUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   chatwootApiToken?: Prisma.SortOrderInput | Prisma.SortOrder
   enableHandoff?: Prisma.SortOrderInput | Prisma.SortOrder
   handoffTeamId?: Prisma.SortOrderInput | Prisma.SortOrder
   handoffAssigneeId?: Prisma.SortOrderInput | Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.AppConfigCountOrderByAggregateInput
-  _avg?: Prisma.AppConfigAvgOrderByAggregateInput
   _max?: Prisma.AppConfigMaxOrderByAggregateInput
   _min?: Prisma.AppConfigMinOrderByAggregateInput
-  _sum?: Prisma.AppConfigSumOrderByAggregateInput
 }
 
 export type AppConfigScalarWhereWithAggregatesInput = {
@@ -476,16 +363,9 @@ export type AppConfigScalarWhereWithAggregatesInput = {
   orgEOffice?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
   preferredLang?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
   responseStyle?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
-  llmModel?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
-  llmModelMedium?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
-  llmModelSmall?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
-  embedModel?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
-  retrievalTopK?: Prisma.IntNullableWithAggregatesFilter<"AppConfig"> | number | null
-  retrievalFinalK?: Prisma.IntNullableWithAggregatesFilter<"AppConfig"> | number | null
   customInstructions?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
   greetingMessage?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
   outOfScopeMessage?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
-  chatwootBaseUrl?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
   chatwootApiToken?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
   enableHandoff?: Prisma.BoolNullableWithAggregatesFilter<"AppConfig"> | boolean | null
   handoffTeamId?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
@@ -494,7 +374,7 @@ export type AppConfigScalarWhereWithAggregatesInput = {
 }
 
 export type AppConfigCreateInput = {
-  id?: string
+  id: string
   orgName?: string | null
   orgPhone?: string | null
   orgSchedule?: string | null
@@ -503,16 +383,9 @@ export type AppConfigCreateInput = {
   orgEOffice?: string | null
   preferredLang?: string | null
   responseStyle?: string | null
-  llmModel?: string | null
-  llmModelMedium?: string | null
-  llmModelSmall?: string | null
-  embedModel?: string | null
-  retrievalTopK?: number | null
-  retrievalFinalK?: number | null
   customInstructions?: string | null
   greetingMessage?: string | null
   outOfScopeMessage?: string | null
-  chatwootBaseUrl?: string | null
   chatwootApiToken?: string | null
   enableHandoff?: boolean | null
   handoffTeamId?: string | null
@@ -521,7 +394,7 @@ export type AppConfigCreateInput = {
 }
 
 export type AppConfigUncheckedCreateInput = {
-  id?: string
+  id: string
   orgName?: string | null
   orgPhone?: string | null
   orgSchedule?: string | null
@@ -530,16 +403,9 @@ export type AppConfigUncheckedCreateInput = {
   orgEOffice?: string | null
   preferredLang?: string | null
   responseStyle?: string | null
-  llmModel?: string | null
-  llmModelMedium?: string | null
-  llmModelSmall?: string | null
-  embedModel?: string | null
-  retrievalTopK?: number | null
-  retrievalFinalK?: number | null
   customInstructions?: string | null
   greetingMessage?: string | null
   outOfScopeMessage?: string | null
-  chatwootBaseUrl?: string | null
   chatwootApiToken?: string | null
   enableHandoff?: boolean | null
   handoffTeamId?: string | null
@@ -557,16 +423,9 @@ export type AppConfigUpdateInput = {
   orgEOffice?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   preferredLang?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responseStyle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  llmModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  llmModelMedium?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  llmModelSmall?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  embedModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  retrievalTopK?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  retrievalFinalK?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   customInstructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   greetingMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   outOfScopeMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  chatwootBaseUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   chatwootApiToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   enableHandoff?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   handoffTeamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -584,16 +443,9 @@ export type AppConfigUncheckedUpdateInput = {
   orgEOffice?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   preferredLang?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responseStyle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  llmModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  llmModelMedium?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  llmModelSmall?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  embedModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  retrievalTopK?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  retrievalFinalK?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   customInstructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   greetingMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   outOfScopeMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  chatwootBaseUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   chatwootApiToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   enableHandoff?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   handoffTeamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -602,7 +454,7 @@ export type AppConfigUncheckedUpdateInput = {
 }
 
 export type AppConfigCreateManyInput = {
-  id?: string
+  id: string
   orgName?: string | null
   orgPhone?: string | null
   orgSchedule?: string | null
@@ -611,16 +463,9 @@ export type AppConfigCreateManyInput = {
   orgEOffice?: string | null
   preferredLang?: string | null
   responseStyle?: string | null
-  llmModel?: string | null
-  llmModelMedium?: string | null
-  llmModelSmall?: string | null
-  embedModel?: string | null
-  retrievalTopK?: number | null
-  retrievalFinalK?: number | null
   customInstructions?: string | null
   greetingMessage?: string | null
   outOfScopeMessage?: string | null
-  chatwootBaseUrl?: string | null
   chatwootApiToken?: string | null
   enableHandoff?: boolean | null
   handoffTeamId?: string | null
@@ -638,16 +483,9 @@ export type AppConfigUpdateManyMutationInput = {
   orgEOffice?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   preferredLang?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responseStyle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  llmModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  llmModelMedium?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  llmModelSmall?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  embedModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  retrievalTopK?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  retrievalFinalK?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   customInstructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   greetingMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   outOfScopeMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  chatwootBaseUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   chatwootApiToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   enableHandoff?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   handoffTeamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -665,16 +503,9 @@ export type AppConfigUncheckedUpdateManyInput = {
   orgEOffice?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   preferredLang?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responseStyle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  llmModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  llmModelMedium?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  llmModelSmall?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  embedModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  retrievalTopK?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  retrievalFinalK?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   customInstructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   greetingMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   outOfScopeMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  chatwootBaseUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   chatwootApiToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   enableHandoff?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   handoffTeamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -692,26 +523,14 @@ export type AppConfigCountOrderByAggregateInput = {
   orgEOffice?: Prisma.SortOrder
   preferredLang?: Prisma.SortOrder
   responseStyle?: Prisma.SortOrder
-  llmModel?: Prisma.SortOrder
-  llmModelMedium?: Prisma.SortOrder
-  llmModelSmall?: Prisma.SortOrder
-  embedModel?: Prisma.SortOrder
-  retrievalTopK?: Prisma.SortOrder
-  retrievalFinalK?: Prisma.SortOrder
   customInstructions?: Prisma.SortOrder
   greetingMessage?: Prisma.SortOrder
   outOfScopeMessage?: Prisma.SortOrder
-  chatwootBaseUrl?: Prisma.SortOrder
   chatwootApiToken?: Prisma.SortOrder
   enableHandoff?: Prisma.SortOrder
   handoffTeamId?: Prisma.SortOrder
   handoffAssigneeId?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
-}
-
-export type AppConfigAvgOrderByAggregateInput = {
-  retrievalTopK?: Prisma.SortOrder
-  retrievalFinalK?: Prisma.SortOrder
 }
 
 export type AppConfigMaxOrderByAggregateInput = {
@@ -724,16 +543,9 @@ export type AppConfigMaxOrderByAggregateInput = {
   orgEOffice?: Prisma.SortOrder
   preferredLang?: Prisma.SortOrder
   responseStyle?: Prisma.SortOrder
-  llmModel?: Prisma.SortOrder
-  llmModelMedium?: Prisma.SortOrder
-  llmModelSmall?: Prisma.SortOrder
-  embedModel?: Prisma.SortOrder
-  retrievalTopK?: Prisma.SortOrder
-  retrievalFinalK?: Prisma.SortOrder
   customInstructions?: Prisma.SortOrder
   greetingMessage?: Prisma.SortOrder
   outOfScopeMessage?: Prisma.SortOrder
-  chatwootBaseUrl?: Prisma.SortOrder
   chatwootApiToken?: Prisma.SortOrder
   enableHandoff?: Prisma.SortOrder
   handoffTeamId?: Prisma.SortOrder
@@ -751,26 +563,14 @@ export type AppConfigMinOrderByAggregateInput = {
   orgEOffice?: Prisma.SortOrder
   preferredLang?: Prisma.SortOrder
   responseStyle?: Prisma.SortOrder
-  llmModel?: Prisma.SortOrder
-  llmModelMedium?: Prisma.SortOrder
-  llmModelSmall?: Prisma.SortOrder
-  embedModel?: Prisma.SortOrder
-  retrievalTopK?: Prisma.SortOrder
-  retrievalFinalK?: Prisma.SortOrder
   customInstructions?: Prisma.SortOrder
   greetingMessage?: Prisma.SortOrder
   outOfScopeMessage?: Prisma.SortOrder
-  chatwootBaseUrl?: Prisma.SortOrder
   chatwootApiToken?: Prisma.SortOrder
   enableHandoff?: Prisma.SortOrder
   handoffTeamId?: Prisma.SortOrder
   handoffAssigneeId?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
-}
-
-export type AppConfigSumOrderByAggregateInput = {
-  retrievalTopK?: Prisma.SortOrder
-  retrievalFinalK?: Prisma.SortOrder
 }
 
 export type StringFieldUpdateOperationsInput = {
@@ -779,14 +579,6 @@ export type StringFieldUpdateOperationsInput = {
 
 export type NullableStringFieldUpdateOperationsInput = {
   set?: string | null
-}
-
-export type NullableIntFieldUpdateOperationsInput = {
-  set?: number | null
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
 }
 
 export type NullableBoolFieldUpdateOperationsInput = {
@@ -809,16 +601,9 @@ export type AppConfigSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   orgEOffice?: boolean
   preferredLang?: boolean
   responseStyle?: boolean
-  llmModel?: boolean
-  llmModelMedium?: boolean
-  llmModelSmall?: boolean
-  embedModel?: boolean
-  retrievalTopK?: boolean
-  retrievalFinalK?: boolean
   customInstructions?: boolean
   greetingMessage?: boolean
   outOfScopeMessage?: boolean
-  chatwootBaseUrl?: boolean
   chatwootApiToken?: boolean
   enableHandoff?: boolean
   handoffTeamId?: boolean
@@ -836,16 +621,9 @@ export type AppConfigSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ext
   orgEOffice?: boolean
   preferredLang?: boolean
   responseStyle?: boolean
-  llmModel?: boolean
-  llmModelMedium?: boolean
-  llmModelSmall?: boolean
-  embedModel?: boolean
-  retrievalTopK?: boolean
-  retrievalFinalK?: boolean
   customInstructions?: boolean
   greetingMessage?: boolean
   outOfScopeMessage?: boolean
-  chatwootBaseUrl?: boolean
   chatwootApiToken?: boolean
   enableHandoff?: boolean
   handoffTeamId?: boolean
@@ -863,16 +641,9 @@ export type AppConfigSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ext
   orgEOffice?: boolean
   preferredLang?: boolean
   responseStyle?: boolean
-  llmModel?: boolean
-  llmModelMedium?: boolean
-  llmModelSmall?: boolean
-  embedModel?: boolean
-  retrievalTopK?: boolean
-  retrievalFinalK?: boolean
   customInstructions?: boolean
   greetingMessage?: boolean
   outOfScopeMessage?: boolean
-  chatwootBaseUrl?: boolean
   chatwootApiToken?: boolean
   enableHandoff?: boolean
   handoffTeamId?: boolean
@@ -890,16 +661,9 @@ export type AppConfigSelectScalar = {
   orgEOffice?: boolean
   preferredLang?: boolean
   responseStyle?: boolean
-  llmModel?: boolean
-  llmModelMedium?: boolean
-  llmModelSmall?: boolean
-  embedModel?: boolean
-  retrievalTopK?: boolean
-  retrievalFinalK?: boolean
   customInstructions?: boolean
   greetingMessage?: boolean
   outOfScopeMessage?: boolean
-  chatwootBaseUrl?: boolean
   chatwootApiToken?: boolean
   enableHandoff?: boolean
   handoffTeamId?: boolean
@@ -907,7 +671,7 @@ export type AppConfigSelectScalar = {
   updatedAt?: boolean
 }
 
-export type AppConfigOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orgName" | "orgPhone" | "orgSchedule" | "orgAddress" | "orgWebsite" | "orgEOffice" | "preferredLang" | "responseStyle" | "llmModel" | "llmModelMedium" | "llmModelSmall" | "embedModel" | "retrievalTopK" | "retrievalFinalK" | "customInstructions" | "greetingMessage" | "outOfScopeMessage" | "chatwootBaseUrl" | "chatwootApiToken" | "enableHandoff" | "handoffTeamId" | "handoffAssigneeId" | "updatedAt", ExtArgs["result"]["appConfig"]>
+export type AppConfigOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orgName" | "orgPhone" | "orgSchedule" | "orgAddress" | "orgWebsite" | "orgEOffice" | "preferredLang" | "responseStyle" | "customInstructions" | "greetingMessage" | "outOfScopeMessage" | "chatwootApiToken" | "enableHandoff" | "handoffTeamId" | "handoffAssigneeId" | "updatedAt", ExtArgs["result"]["appConfig"]>
 
 export type $AppConfigPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "AppConfig"
@@ -922,16 +686,9 @@ export type $AppConfigPayload<ExtArgs extends runtime.Types.Extensions.InternalA
     orgEOffice: string | null
     preferredLang: string | null
     responseStyle: string | null
-    llmModel: string | null
-    llmModelMedium: string | null
-    llmModelSmall: string | null
-    embedModel: string | null
-    retrievalTopK: number | null
-    retrievalFinalK: number | null
     customInstructions: string | null
     greetingMessage: string | null
     outOfScopeMessage: string | null
-    chatwootBaseUrl: string | null
     chatwootApiToken: string | null
     enableHandoff: boolean | null
     handoffTeamId: string | null
@@ -1369,16 +1126,9 @@ export interface AppConfigFieldRefs {
   readonly orgEOffice: Prisma.FieldRef<"AppConfig", 'String'>
   readonly preferredLang: Prisma.FieldRef<"AppConfig", 'String'>
   readonly responseStyle: Prisma.FieldRef<"AppConfig", 'String'>
-  readonly llmModel: Prisma.FieldRef<"AppConfig", 'String'>
-  readonly llmModelMedium: Prisma.FieldRef<"AppConfig", 'String'>
-  readonly llmModelSmall: Prisma.FieldRef<"AppConfig", 'String'>
-  readonly embedModel: Prisma.FieldRef<"AppConfig", 'String'>
-  readonly retrievalTopK: Prisma.FieldRef<"AppConfig", 'Int'>
-  readonly retrievalFinalK: Prisma.FieldRef<"AppConfig", 'Int'>
   readonly customInstructions: Prisma.FieldRef<"AppConfig", 'String'>
   readonly greetingMessage: Prisma.FieldRef<"AppConfig", 'String'>
   readonly outOfScopeMessage: Prisma.FieldRef<"AppConfig", 'String'>
-  readonly chatwootBaseUrl: Prisma.FieldRef<"AppConfig", 'String'>
   readonly chatwootApiToken: Prisma.FieldRef<"AppConfig", 'String'>
   readonly enableHandoff: Prisma.FieldRef<"AppConfig", 'Boolean'>
   readonly handoffTeamId: Prisma.FieldRef<"AppConfig", 'String'>
@@ -1583,7 +1333,7 @@ export type AppConfigCreateArgs<ExtArgs extends runtime.Types.Extensions.Interna
   /**
    * The data needed to create a AppConfig.
    */
-  data?: Prisma.XOR<Prisma.AppConfigCreateInput, Prisma.AppConfigUncheckedCreateInput>
+  data: Prisma.XOR<Prisma.AppConfigCreateInput, Prisma.AppConfigUncheckedCreateInput>
 }
 
 /**

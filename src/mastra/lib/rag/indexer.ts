@@ -18,6 +18,12 @@ export interface IndexDocumentsOptions {
   embedModelName: string;
   translator: Agent;
   logger: ReturnType<import("@mastra/core").Mastra["getLogger"]>;
+  /** Mastra tenant the chunks belong to. Stored on every Qdrant point
+   *  so retrieval and deprovisioning can filter by it. */
+  tenantId: string;
+  /** Per-run request context propagated to the translator agent so it
+   *  can resolve the tenant's model selection. */
+  requestContext: import("@mastra/core/request-context").RequestContext;
 }
 
 export interface IndexDocumentsResult {
@@ -40,11 +46,11 @@ export interface IndexDocumentsResult {
  *    - content = original-language text (what the agent sees)
  *    - searchContent = Spanish text (what was embedded)
  */
-export async function indexDocuments(
+  export async function indexDocuments(
   documents: RagDocument[],
   options: IndexDocumentsOptions,
 ): Promise<IndexDocumentsResult> {
-  const { vectorStore, embedModel, embedModelName, translator, logger } = options;
+  const { vectorStore, embedModel, embedModelName, translator, logger, tenantId, requestContext } = options;
   let indexed = 0;
   let skipped = 0;
   let errors = 0;
@@ -79,7 +85,7 @@ export async function indexDocuments(
 
       // 3. Translate each chunk to Spanish if needed
       logger.debug(`[indexer] Translating ${chunks.length} chunks to Spanish for ${doc.source}`);
-      const { texts: spanishTexts, fallbacks } = await translateChunks(chunks, lang, translator, logger);
+      const { texts: spanishTexts, fallbacks } = await translateChunks(chunks, lang, translator, logger, requestContext);
       translationFallbacks += fallbacks;
       logger.debug(`[indexer] Translation done for ${doc.source} (fallbacks=${fallbacks})`);
 
@@ -95,6 +101,7 @@ export async function indexDocuments(
 
       const metadata = chunks.map((chunk, i) => ({
         documentId: doc.id,
+        tenantId,
         title: doc.title,
         source: doc.source,
         sourceType: doc.sourceType,
@@ -151,6 +158,7 @@ async function translateChunks(
   lang: string,
   translator: Agent,
   logger: ReturnType<import("@mastra/core").Mastra["getLogger"]>,
+  requestContext: import("@mastra/core/request-context").RequestContext,
 ): Promise<{ texts: string[]; fallbacks: number }> {
   if (lang === "es") {
     return { texts: chunks.map((c) => c.text), fallbacks: 0 };
@@ -165,12 +173,15 @@ async function translateChunks(
     const translations = await Promise.all(
       batch.map(async (chunk, batchIdx) => {
         try {
-          const response = await translator.generate([
-            {
-              role: "user",
-              content: `Translate the following text to Spanish:\n\n${chunk.text}`,
-            },
-          ]);
+          const response = await translator.generate(
+            [
+              {
+                role: "user",
+                content: `Translate the following text to Spanish:\n\n${chunk.text}`,
+              },
+            ],
+            { requestContext },
+          );
           return { text: response.text, failed: false };
         } catch (err) {
           logger.warn(

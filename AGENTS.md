@@ -22,6 +22,27 @@ Use these commands to interact with the project.
 npm install
 ```
 
+### Local services
+
+Mastra needs Postgres, Redis and Qdrant. `docker-compose.dev.yaml` starts them
+on shifted ports (5433, 6379, 6335) so they can coexist with other projects:
+
+```bash
+docker compose -f docker-compose.dev.yaml up -d
+```
+
+Then apply the Prisma migrations **before** starting Mastra:
+
+```bash
+pnpm exec prisma migrate deploy
+```
+
+Order matters. Mastra creates its own tables in the `public` schema on first
+boot, and `prisma migrate deploy` then refuses to run with `P3005` ("schema is
+not empty") because it inspects the whole database, not just its own `app`
+schema. If that happens, drop and recreate the database, migrate, then start
+Mastra.
+
 ### Development
 
 Start the Mastra Studio at localhost:4111 by running the `dev` script:
