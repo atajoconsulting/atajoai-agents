@@ -46,6 +46,9 @@ const configPatchSchema = z
     enableHandoff: z.boolean().optional(),
     handoffTeamId: nullablePositiveInt,
     handoffAssigneeId: nullablePositiveInt,
+    llmModel: nullableTrimmedString,
+    llmModelSmall: nullableTrimmedString,
+    embedModel: nullableTrimmedString,
   })
   .strict();
 
@@ -65,6 +68,9 @@ const serializedConfigSchema = z.object({
   enableHandoff: z.boolean(),
   handoffTeamId: z.number().int().positive().nullable(),
   handoffAssigneeId: z.number().int().positive().nullable(),
+  llmModel: z.string(),
+  llmModelSmall: z.string(),
+  embedModel: z.string(),
   updatedAt: z.date(),
 });
 
@@ -107,14 +113,20 @@ export const chatwootConfigRoutes = [
     handler: async (c) => {
       const tenantId = c.req.param("tenantId");
       const logger = c.get("mastra").getLogger();
-      const [config, apiToken] = await Promise.all([
+      const [config, apiToken, raw] = await Promise.all([
         getAppConfig(tenantId),
         getChatwootApiToken(tenantId),
+        prisma.appConfig.findUnique({ where: { id: tenantId } }),
       ]);
       logger.debug("Config fetched", { tenantId });
       return c.json({
         ...serializeAppConfig(config),
         chatwootApiToken: apiToken ?? null,
+        overrides: {
+          llmModel: raw?.llmModel ?? null,
+          llmModelSmall: raw?.llmModelSmall ?? null,
+          embedModel: raw?.embedModel ?? null,
+        },
       }, 200);
     },
   }),
@@ -196,15 +208,21 @@ export const chatwootConfigRoutes = [
         invalidateAppConfigCache(tenantId),
         hasTokenChange ? invalidateChatwootApiTokenCache(tenantId) : Promise.resolve(),
       ]);
-      const [updatedConfig, updatedToken] = await Promise.all([
+      const [updatedConfig, updatedToken, updatedRaw] = await Promise.all([
         getAppConfig(tenantId, { forceRefresh: true }),
         getChatwootApiToken(tenantId),
+        prisma.appConfig.findUnique({ where: { id: tenantId } }),
       ]);
       const changedKeys = Object.keys(parsed.data);
       logger.debug(`Config updated: ${changedKeys.join(", ")}`, { tenantId });
       return c.json({
         ...serializeAppConfig(updatedConfig),
         chatwootApiToken: updatedToken ?? null,
+        overrides: {
+          llmModel: updatedRaw?.llmModel ?? null,
+          llmModelSmall: updatedRaw?.llmModelSmall ?? null,
+          embedModel: updatedRaw?.embedModel ?? null,
+        },
       }, 200);
     },
   }),

@@ -100,10 +100,10 @@ function resolveConfig(
     enableHandoff: record?.enableHandoff ?? DEFAULT_CONFIG.enableHandoff,
     handoffTeamId: parseOptionalInteger(record?.handoffTeamId) ?? DEFAULT_CONFIG.handoffTeamId,
     handoffAssigneeId: parseOptionalInteger(record?.handoffAssigneeId) ?? DEFAULT_CONFIG.handoffAssigneeId,
-    // --- global (models, retrieval) — no per-tenant override ---
-    llmModel: global.llmModel,
-    llmModelSmall: global.llmModelSmall,
-    embedModel: global.embedModel,
+    // --- global (models, retrieval) with per-tenant overrides ---
+    llmModel: trimOrNull(record?.llmModel) ?? global.llmModel,
+    llmModelSmall: trimOrNull(record?.llmModelSmall) ?? global.llmModelSmall,
+    embedModel: trimOrNull(record?.embedModel) ?? global.embedModel,
     retrievalTopK: global.retrievalTopK,
     retrievalFinalK: global.retrievalFinalK,
     retrievalMinScore: DEFAULT_CONFIG.retrievalMinScore,
@@ -209,6 +209,9 @@ export function serializeAppConfig(config: ResolvedAppConfig) {
     enableHandoff: config.enableHandoff,
     handoffTeamId: config.handoffTeamId,
     handoffAssigneeId: config.handoffAssigneeId,
+    llmModel: config.llmModel,
+    llmModelSmall: config.llmModelSmall,
+    embedModel: config.embedModel,
     updatedAt: config.updatedAt,
   };
 }
