@@ -7,7 +7,9 @@ RUN corepack enable && corepack prepare pnpm@10.31.0 --activate
 WORKDIR /app
 
 # Copiar archivos de dependencias primero (cache de layers)
-COPY package.json pnpm-lock.yaml ./
+# pnpm-workspace.yaml va incluido: pnpm 11 lee allowBuilds desde ahí y sin el
+# archivo un install en CI falla con ERR_PNPM_IGNORED_BUILDS.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Instalar todas las dependencias (incluyendo devDependencies para el build)
 RUN pnpm install --frozen-lockfile
