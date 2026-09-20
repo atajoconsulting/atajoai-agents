@@ -4,11 +4,10 @@ import { redis } from "./db/redis";
 import { DEFAULT_CONFIG } from "./default-config";
 import { decryptToken, encryptToken } from "./crypto";
 import { env } from "../env";
+import { getGlobalConfig, type ResolvedGlobalConfig } from "./global-config";
 
-export const DEFAULT_APP_CONFIG_ID = "default";
-
-const REDIS_KEY = "app:config:default";
-const REDIS_TOKEN_KEY = "app:token:chatwoot";
+const REDIS_CONFIG_PREFIX = "app:config";
+const REDIS_TOKEN_PREFIX = "app:token";
 
 export interface ResolvedAppConfig {
   id: string;
@@ -21,7 +20,6 @@ export interface ResolvedAppConfig {
   preferredLang: string;
   responseStyle: "brief_structured" | "brief_plain";
   llmModel: string;
-  llmModelMedium: string;
   llmModelSmall: string;
   embedModel: string;
   retrievalTopK: number;
@@ -30,14 +28,31 @@ export interface ResolvedAppConfig {
   customInstructions: string | null;
   greetingMessage: string;
   outOfScopeMessage: string;
-  chatwootBaseUrl: string | null;
+  /** Whether the agent should attempt to handoff to a human. */
   enableHandoff: boolean;
   handoffTeamId: number | null;
   handoffAssigneeId: number | null;
   updatedAt: Date;
 }
 
-let inflightConfig: Promise<ResolvedAppConfig> | null = null;
+const TENANT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
+function assertTenantId(tenantId: string): void {
+  if (typeof tenantId !== "string" || !TENANT_ID_PATTERN.test(tenantId)) {
+    throw new Error(`Invalid tenantId: ${JSON.stringify(tenantId)}`);
+  }
+}
+
+function redisConfigKey(tenantId: string): string {
+  return `${REDIS_CONFIG_PREFIX}:${tenantId}`;
+}
+
+function redisTokenKey(tenantId: string): string {
+  return `${REDIS_TOKEN_PREFIX}:${tenantId}`;
+}
+
+/** Inflight fetches per tenant — collapse concurrent DB hits into one query. */
+const inflightConfig: Map<string, Promise<ResolvedAppConfig>> = new Map();
 
 function parseOptionalInteger(value: number | string | null | undefined): number | null {
   if (value === null || value === undefined || value === "") {
@@ -59,37 +74,39 @@ function trimOrNull(value: string | null | undefined): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function resolveConfig(record: AppConfig | null): ResolvedAppConfig {
+function resolveConfig(
+  record: AppConfig | null,
+  tenantId: string,
+  global: ResolvedGlobalConfig,
+): ResolvedAppConfig {
   return {
-    id: record?.id ?? DEFAULT_APP_CONFIG_ID,
+    id: record?.id ?? tenantId,
+    // --- per-tenant (org, behavior, handoff) ---
     orgName: trimOrNull(record?.orgName) ?? DEFAULT_CONFIG.orgName,
     orgPhone: trimOrNull(record?.orgPhone) ?? DEFAULT_CONFIG.orgPhone,
     orgSchedule: trimOrNull(record?.orgSchedule) ?? DEFAULT_CONFIG.orgSchedule,
     orgAddress: trimOrNull(record?.orgAddress) ?? DEFAULT_CONFIG.orgAddress,
     orgWebsite: trimOrNull(record?.orgWebsite) ?? DEFAULT_CONFIG.orgWebsite,
-    orgEOffice:
-      trimOrNull(record?.orgEOffice) ?? DEFAULT_CONFIG.orgEOffice,
-    preferredLang:
-      trimOrNull(record?.preferredLang) ?? DEFAULT_CONFIG.preferredLang,
+    orgEOffice: trimOrNull(record?.orgEOffice) ?? DEFAULT_CONFIG.orgEOffice,
+    preferredLang: trimOrNull(record?.preferredLang) ?? DEFAULT_CONFIG.preferredLang,
     responseStyle:
       record?.responseStyle === "brief_plain" ||
       record?.responseStyle === "brief_structured"
         ? record.responseStyle
         : DEFAULT_CONFIG.responseStyle,
-    llmModel: trimOrNull(record?.llmModel) ?? DEFAULT_CONFIG.llmModel,
-    llmModelMedium: trimOrNull(record?.llmModelMedium) ?? DEFAULT_CONFIG.llmModelMedium,
-    llmModelSmall: trimOrNull(record?.llmModelSmall) ?? DEFAULT_CONFIG.llmModelSmall,
-    embedModel: trimOrNull(record?.embedModel) ?? DEFAULT_CONFIG.embedModel,
-    retrievalTopK: record?.retrievalTopK ?? DEFAULT_CONFIG.retrievalTopK,
-    retrievalFinalK: record?.retrievalFinalK ?? DEFAULT_CONFIG.retrievalFinalK,
-    retrievalMinScore: DEFAULT_CONFIG.retrievalMinScore,
     customInstructions: trimOrNull(record?.customInstructions),
     greetingMessage: trimOrNull(record?.greetingMessage) ?? DEFAULT_CONFIG.greetingMessage,
     outOfScopeMessage: trimOrNull(record?.outOfScopeMessage) ?? DEFAULT_CONFIG.outOfScopeMessage,
-    chatwootBaseUrl: trimOrNull(record?.chatwootBaseUrl) ?? DEFAULT_CONFIG.chatwootBaseUrl,
     enableHandoff: record?.enableHandoff ?? DEFAULT_CONFIG.enableHandoff,
     handoffTeamId: parseOptionalInteger(record?.handoffTeamId) ?? DEFAULT_CONFIG.handoffTeamId,
     handoffAssigneeId: parseOptionalInteger(record?.handoffAssigneeId) ?? DEFAULT_CONFIG.handoffAssigneeId,
+    // --- global (models, retrieval) with per-tenant overrides ---
+    llmModel: trimOrNull(record?.llmModel) ?? global.llmModel,
+    llmModelSmall: trimOrNull(record?.llmModelSmall) ?? global.llmModelSmall,
+    embedModel: trimOrNull(record?.embedModel) ?? global.embedModel,
+    retrievalTopK: global.retrievalTopK,
+    retrievalFinalK: global.retrievalFinalK,
+    retrievalMinScore: DEFAULT_CONFIG.retrievalMinScore,
     updatedAt: record?.updatedAt ?? new Date(0),
   };
 }
@@ -112,63 +129,66 @@ function deserializeConfig(raw: string): ResolvedAppConfig {
   return parsed as ResolvedAppConfig;
 }
 
-async function fetchAndCache(): Promise<ResolvedAppConfig> {
-  let record: AppConfig | null = null;
+async function fetchAndCache(tenantId: string): Promise<ResolvedAppConfig> {
+  const [record, global] = await Promise.all([
+    prisma.appConfig.findUnique({ where: { id: tenantId } }).catch((error) => {
+      const msg = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`[config] Failed to read AppConfig from DB (tenant=${tenantId}): ${msg}\n`);
+      return null;
+    }),
+    getGlobalConfig(),
+  ]);
+
+  const config = resolveConfig(record, tenantId, global);
 
   try {
-    record = await prisma.appConfig.findUnique({
-      where: { id: DEFAULT_APP_CONFIG_ID },
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`[config] Failed to read AppConfig from DB: ${message}\n`);
-  }
-
-  const config = resolveConfig(record);
-
-  try {
-    await redis.set(REDIS_KEY, JSON.stringify(config));
+    await redis.set(redisConfigKey(tenantId), JSON.stringify(config));
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`[config] Redis SET failed, config uncached: ${msg}\n`);
+    process.stderr.write(`[config] Redis SET failed, config uncached (tenant=${tenantId}): ${msg}\n`);
   }
 
   return config;
 }
 
-export async function getAppConfig(options?: {
-  forceRefresh?: boolean;
-}): Promise<ResolvedAppConfig> {
+export async function getAppConfig(
+  tenantId: string,
+  options?: { forceRefresh?: boolean },
+): Promise<ResolvedAppConfig> {
+  assertTenantId(tenantId);
+
   if (!options?.forceRefresh) {
     try {
-      const cached = await redis.get(REDIS_KEY);
+      const cached = await redis.get(redisConfigKey(tenantId));
       if (cached) {
         return deserializeConfig(cached);
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`[config] Redis GET failed, falling back to DB: ${msg}\n`);
+      process.stderr.write(`[config] Redis GET failed, falling back to DB (tenant=${tenantId}): ${msg}\n`);
     }
   }
 
-  if (inflightConfig) {
-    return inflightConfig;
+  const inflight = inflightConfig.get(tenantId);
+  if (inflight) {
+    return inflight;
   }
 
-  inflightConfig = fetchAndCache().finally(() => {
-    inflightConfig = null;
+  const promise = fetchAndCache(tenantId).finally(() => {
+    inflightConfig.delete(tenantId);
   });
-
-  return inflightConfig;
+  inflightConfig.set(tenantId, promise);
+  return promise;
 }
 
-export async function invalidateAppConfigCache(): Promise<void> {
-  inflightConfig = null;
+export async function invalidateAppConfigCache(tenantId: string): Promise<void> {
+  assertTenantId(tenantId);
+  inflightConfig.delete(tenantId);
   try {
-    await redis.del(REDIS_KEY);
+    await redis.del(redisConfigKey(tenantId));
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`[config] Redis DEL failed, cache will expire via TTL: ${msg}\n`);
+    process.stderr.write(`[config] Redis DEL failed, cache will expire via TTL (tenant=${tenantId}): ${msg}\n`);
   }
 }
 
@@ -183,20 +203,15 @@ export function serializeAppConfig(config: ResolvedAppConfig) {
     orgEOffice: config.orgEOffice,
     preferredLang: config.preferredLang,
     responseStyle: config.responseStyle,
-    llmModel: config.llmModel,
-    llmModelMedium: config.llmModelMedium,
-    llmModelSmall: config.llmModelSmall,
-    embedModel: config.embedModel,
-    retrievalTopK: config.retrievalTopK,
-    retrievalFinalK: config.retrievalFinalK,
-    retrievalMinScore: config.retrievalMinScore,
     customInstructions: config.customInstructions,
     greetingMessage: config.greetingMessage,
     outOfScopeMessage: config.outOfScopeMessage,
-    chatwootBaseUrl: config.chatwootBaseUrl,
     enableHandoff: config.enableHandoff,
     handoffTeamId: config.handoffTeamId,
     handoffAssigneeId: config.handoffAssigneeId,
+    llmModel: config.llmModel,
+    llmModelSmall: config.llmModelSmall,
+    embedModel: config.embedModel,
     updatedAt: config.updatedAt,
   };
 }
@@ -205,9 +220,11 @@ export function hasHumanHandoffTarget(config: ResolvedAppConfig): boolean {
   return Boolean(config.handoffAssigneeId || config.handoffTeamId);
 }
 
-export async function getChatwootApiToken(): Promise<string | null> {
+export async function getChatwootApiToken(tenantId: string): Promise<string | null> {
+  assertTenantId(tenantId);
+
   try {
-    const cached = await redis.get(REDIS_TOKEN_KEY);
+    const cached = await redis.get(redisTokenKey(tenantId));
     if (cached) {
       return decryptToken(cached);
     }
@@ -216,7 +233,7 @@ export async function getChatwootApiToken(): Promise<string | null> {
   let token: string | null = null;
   try {
     const record = await prisma.appConfig.findUnique({
-      where: { id: DEFAULT_APP_CONFIG_ID },
+      where: { id: tenantId },
       select: { chatwootApiToken: true },
     });
     if (record?.chatwootApiToken) {
@@ -224,22 +241,21 @@ export async function getChatwootApiToken(): Promise<string | null> {
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`[config] Failed to read chatwootApiToken from DB: ${msg}\n`);
+    process.stderr.write(`[config] Failed to read chatwootApiToken from DB (tenant=${tenantId}): ${msg}\n`);
   }
-
-  token ??= env.CHATWOOT_API_TOKEN ?? null;
 
   if (token) {
     try {
-      await redis.set(REDIS_TOKEN_KEY, encryptToken(token));
+      await redis.set(redisTokenKey(tenantId), encryptToken(token));
     } catch {}
   }
 
   return token;
 }
 
-export async function invalidateChatwootApiTokenCache(): Promise<void> {
+export async function invalidateChatwootApiTokenCache(tenantId: string): Promise<void> {
+  assertTenantId(tenantId);
   try {
-    await redis.del(REDIS_TOKEN_KEY);
+    await redis.del(redisTokenKey(tenantId));
   } catch {}
 }

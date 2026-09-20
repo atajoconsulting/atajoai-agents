@@ -1,5 +1,6 @@
 import { createStep, createWorkflow } from "@mastra/core/workflows";
 import { ModelRouterEmbeddingModel } from "@mastra/core/llm";
+import { RequestContext } from "@mastra/core/request-context";
 import { z } from "zod";
 import { extractPdfText } from "../lib/document-extractor/pdf-extractor";
 import { extractDocxText } from "../lib/document-extractor/docx-extractor";
@@ -15,6 +16,7 @@ import { detectLang } from "../lib/language";
 export { documentIndexerInputSchema, documentIndexerOutputSchema };
 
 const extractedDocSchema = z.object({
+  tenantId: z.string().min(1),
   documents: z.array(
     z.object({
       filePath: z.string(),
@@ -90,7 +92,7 @@ const extractText = createStep({
       }
     }
 
-    return { documents };
+    return { tenantId: inputData.tenantId, documents };
   },
 });
 
@@ -103,9 +105,13 @@ const indexExtractedDocuments = createStep({
   execute: async ({ inputData, mastra }) => {
     const logger = mastra.getLogger();
     const vectorStore = mastra.getVector("qdrant");
-    const config = await getAppConfig();
+    const tenantId = inputData.tenantId;
+    const config = await getAppConfig(tenantId);
     const embedModel = new ModelRouterEmbeddingModel(config.embedModel);
     const translator = mastra.getAgent("translatorAgent");
+
+    const requestContext = new RequestContext();
+    requestContext.set("tenantId", tenantId);
 
     const ragDocuments: RagDocument[] = inputData.documents.map((doc) =>
       fileToRagDocument({
@@ -123,6 +129,8 @@ const indexExtractedDocuments = createStep({
       embedModelName: config.embedModel,
       translator,
       logger,
+      tenantId,
+      requestContext,
     });
 
     logger.info(

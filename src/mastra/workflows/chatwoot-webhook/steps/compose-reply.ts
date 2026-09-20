@@ -13,7 +13,7 @@ export const composeCitizenReply = createStep({
   description: "Composes the citizen-facing message without tool access",
   inputSchema: judgedResultSchema,
   outputSchema: composedResultSchema,
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData, mastra, requestContext }) => {
     const t0 = Date.now();
     const logger = mastra?.getLogger();
     const config: ResolvedAppConfig = inputData.config;
@@ -88,6 +88,7 @@ export const composeCitizenReply = createStep({
           temperature: 0.1,
           maxOutputTokens: 350,
         },
+        requestContext,
       },
     );
 

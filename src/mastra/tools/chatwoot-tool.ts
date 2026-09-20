@@ -13,6 +13,7 @@ export const chatwootSendMessageTool = createTool({
   inputSchema: z.object({
     accountId: z.number().describe("Chatwoot account ID"),
     conversationId: z.number().describe("Chatwoot conversation ID"),
+    tenantId: z.string().describe("Mastra tenant ID"),
     content: z.string().describe("Message content to send"),
     messageType: z
       .enum(["outgoing", "template"])
@@ -33,6 +34,7 @@ export const chatwootSendMessageTool = createTool({
   execute: async ({
     accountId,
     conversationId,
+    tenantId,
     content,
     messageType,
     private: isPrivate,
@@ -40,6 +42,7 @@ export const chatwootSendMessageTool = createTool({
     return sendChatwootMessage({
       accountId,
       conversationId,
+      tenantId,
       content,
       messageType,
       private: isPrivate,

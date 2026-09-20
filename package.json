@@ -14,22 +14,22 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@11.5.1",
   "type": "module",
   "engines": {
     "node": ">=22.13.0"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1024.0",
-    "@mastra/core": "^1.23.0",
-    "@mastra/evals": "^1.2.1",
-    "@mastra/libsql": "^1.8.0",
-    "@mastra/loggers": "^1.1.0",
-    "@mastra/memory": "^1.14.0",
-    "@mastra/observability": "^1.7.3",
-    "@mastra/pg": "^1.9.0",
+    "@mastra/core": "^1.40.0",
+    "@mastra/evals": "^1.2.4",
+    "@mastra/libsql": "^1.12.1",
+    "@mastra/loggers": "^1.1.2",
+    "@mastra/memory": "^1.20.2",
+    "@mastra/observability": "^1.14.1",
+    "@mastra/pg": "^1.12.1",
     "@mastra/qdrant": "^1.0.2",
-    "@mastra/rag": "^2.1.3",
+    "@mastra/rag": "^2.2.1",
     "@mistralai/mistralai": "^2.1.2",
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "7.6.0",
@@ -56,7 +56,7 @@
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@types/pdf-parse": "^1.1.5",
-    "mastra": "^1.4.0",
+    "mastra": "^1.12.1",
     "typescript": "^5.9.3"
   }
 }

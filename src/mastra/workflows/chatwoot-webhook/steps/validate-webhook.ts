@@ -13,15 +13,21 @@ export const validateWebhook = createStep({
     "Validates the incoming Chatwoot webhook, deduplicates, rate-limits, and extracts relevant data",
   inputSchema: chatwootWebhookSchema,
   outputSchema: validationResultSchema,
-  execute: async ({ inputData, mastra, abort }) => {
+  execute: async ({ inputData, mastra, abort, requestContext }) => {
     const t0 = Date.now();
     const logger = mastra?.getLogger();
     const channel = normalizeChannel(inputData.conversation?.channel);
 
-    logger.debug(`${inputData}`)
+    // The tenant travels in the URL, not in the Chatwoot payload, so the
+    // route puts it on the run's request context. Fall back to the body for
+    // callers that still inline it.
+    const tenantId =
+      (requestContext?.get("tenantId") as string | undefined) ??
+      inputData.tenantId;
 
     const skip = {
       shouldProcess: false,
+      tenantId: tenantId ?? "",
       accountId: 0,
       conversationId: 0,
       messageContent: "",
@@ -34,6 +40,12 @@ export const validateWebhook = createStep({
       conversationStatus: null,
       currentAssigneeType: null,
     };
+
+    if (!tenantId) {
+      logger?.error("[validate] Webhook arrived without tenantId — skipping");
+      abort();
+      return skip;
+    }
 
     if (
       inputData.event !== "message_created" ||
@@ -75,17 +87,27 @@ export const validateWebhook = createStep({
       return skip;
     }
 
-    // Fetch config once for the entire pipeline
-    const config = await getAppConfig();
+    // Fetch the tenant's config once for the entire pipeline.
+    // The webhook will be ignored if the tenant has never been provisioned
+    // (e.g. the AgentBot was deleted but the webhook is still queued).
+    const config = await getAppConfig(tenantId);
+    if (!config) {
+      logger?.error(`[validate] No AppConfig for tenant=${tenantId} — skipping`);
+      abort();
+      return skip;
+    }
 
+    // Per-tenant memory keys keep conversation history isolated between
+    // tenants and between bots in the same account.
     const result = {
       shouldProcess: true,
+      tenantId,
       accountId: inputData.account.id,
       conversationId: inputData.conversation.id,
       messageContent: inputData.content.trim().slice(0, MAX_INPUT_LENGTH),
       senderName: inputData.sender?.name || "Ciudadano",
-      threadId: `chatwoot-conv-${inputData.conversation.id}`,
-      resourceId: `chatwoot-${inputData.conversation.id}`,
+      threadId: `${tenantId}-conv-${inputData.conversation.id}`,
+      resourceId: `${tenantId}-${inputData.conversation.id}`,
       channel,
       config,
       inboxId: inputData.inbox?.id ?? inputData.conversation?.inbox_id ?? null,
@@ -96,6 +118,7 @@ export const validateWebhook = createStep({
     if (logger) {
       logStepMetrics(logger, "validate-webhook", {
         durationMs: Date.now() - t0,
+        extra: { tenantId },
       });
     }
 

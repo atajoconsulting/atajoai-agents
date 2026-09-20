@@ -9,5 +9,6 @@
  * 🟢 You can import this file directly.
  */
 export type * from './models/AppConfig'
+export type * from './models/GlobalConfig'
 export type * from './models/IndexedDocument'
 export type * from './commonInputTypes'
