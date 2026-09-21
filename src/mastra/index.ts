@@ -75,9 +75,14 @@ export const mastra = new Mastra({
 
         await next();
       },
-      // X-API-Key auth for all /chatwoot/* routes
+      // X-API-Key auth for all /chatwoot/* routes. The webhook is exempt:
+      // Chatwoot signs it with the X-Chatwoot-Signature HMAC instead, and the
+      // unguessable tenant UUID in the path is the capability.
       async (c, next) => {
-        if (c.req.path.startsWith("/chatwoot/")) {
+        if (
+          c.req.path.startsWith("/chatwoot/") &&
+          !c.req.path.startsWith("/chatwoot/webhook/")
+        ) {
           return chatwootApiKeyAuth(c, next);
         }
         await next();
