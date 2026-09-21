@@ -89,6 +89,9 @@ export const AppConfigScalarFieldEnum = {
   enableHandoff: 'enableHandoff',
   handoffTeamId: 'handoffTeamId',
   handoffAssigneeId: 'handoffAssigneeId',
+  llmModel: 'llmModel',
+  llmModelSmall: 'llmModelSmall',
+  embedModel: 'embedModel',
   updatedAt: 'updatedAt'
 } as const
 

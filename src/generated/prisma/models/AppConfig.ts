@@ -16,9 +16,8 @@ import type * as Prisma from "../internal/prismaNamespace"
  * Model AppConfig
  * AppConfig is keyed by tenant (each Chatwoot AgentBot = one tenant).
  * Stores per-tenant org identity, behavior, handoff, and the Chatwoot API
- * token.  Model and retrieval config live in GlobalConfig (shared by all
- * tenants); the fields are kept here as nullable so a per-tenant override
- * can be added in the future without a schema change.
+ * token. Model fields are nullable and fall back to the GlobalConfig
+ * defaults when unset (per-agent model override).
  */
 export type AppConfigModel = runtime.Types.Result.DefaultSelection<Prisma.$AppConfigPayload>
 
@@ -45,6 +44,9 @@ export type AppConfigMinAggregateOutputType = {
   enableHandoff: boolean | null
   handoffTeamId: string | null
   handoffAssigneeId: string | null
+  llmModel: string | null
+  llmModelSmall: string | null
+  embedModel: string | null
   updatedAt: Date | null
 }
 
@@ -65,6 +67,9 @@ export type AppConfigMaxAggregateOutputType = {
   enableHandoff: boolean | null
   handoffTeamId: string | null
   handoffAssigneeId: string | null
+  llmModel: string | null
+  llmModelSmall: string | null
+  embedModel: string | null
   updatedAt: Date | null
 }
 
@@ -85,6 +90,9 @@ export type AppConfigCountAggregateOutputType = {
   enableHandoff: number
   handoffTeamId: number
   handoffAssigneeId: number
+  llmModel: number
+  llmModelSmall: number
+  embedModel: number
   updatedAt: number
   _all: number
 }
@@ -107,6 +115,9 @@ export type AppConfigMinAggregateInputType = {
   enableHandoff?: true
   handoffTeamId?: true
   handoffAssigneeId?: true
+  llmModel?: true
+  llmModelSmall?: true
+  embedModel?: true
   updatedAt?: true
 }
 
@@ -127,6 +138,9 @@ export type AppConfigMaxAggregateInputType = {
   enableHandoff?: true
   handoffTeamId?: true
   handoffAssigneeId?: true
+  llmModel?: true
+  llmModelSmall?: true
+  embedModel?: true
   updatedAt?: true
 }
 
@@ -147,6 +161,9 @@ export type AppConfigCountAggregateInputType = {
   enableHandoff?: true
   handoffTeamId?: true
   handoffAssigneeId?: true
+  llmModel?: true
+  llmModelSmall?: true
+  embedModel?: true
   updatedAt?: true
   _all?: true
 }
@@ -240,6 +257,9 @@ export type AppConfigGroupByOutputType = {
   enableHandoff: boolean | null
   handoffTeamId: string | null
   handoffAssigneeId: string | null
+  llmModel: string | null
+  llmModelSmall: string | null
+  embedModel: string | null
   updatedAt: Date
   _count: AppConfigCountAggregateOutputType | null
   _min: AppConfigMinAggregateOutputType | null
@@ -281,6 +301,9 @@ export type AppConfigWhereInput = {
   enableHandoff?: Prisma.BoolNullableFilter<"AppConfig"> | boolean | null
   handoffTeamId?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   handoffAssigneeId?: Prisma.StringNullableFilter<"AppConfig"> | string | null
+  llmModel?: Prisma.StringNullableFilter<"AppConfig"> | string | null
+  llmModelSmall?: Prisma.StringNullableFilter<"AppConfig"> | string | null
+  embedModel?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   updatedAt?: Prisma.DateTimeFilter<"AppConfig"> | Date | string
 }
 
@@ -301,6 +324,9 @@ export type AppConfigOrderByWithRelationInput = {
   enableHandoff?: Prisma.SortOrderInput | Prisma.SortOrder
   handoffTeamId?: Prisma.SortOrderInput | Prisma.SortOrder
   handoffAssigneeId?: Prisma.SortOrderInput | Prisma.SortOrder
+  llmModel?: Prisma.SortOrderInput | Prisma.SortOrder
+  llmModelSmall?: Prisma.SortOrderInput | Prisma.SortOrder
+  embedModel?: Prisma.SortOrderInput | Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -324,6 +350,9 @@ export type AppConfigWhereUniqueInput = Prisma.AtLeast<{
   enableHandoff?: Prisma.BoolNullableFilter<"AppConfig"> | boolean | null
   handoffTeamId?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   handoffAssigneeId?: Prisma.StringNullableFilter<"AppConfig"> | string | null
+  llmModel?: Prisma.StringNullableFilter<"AppConfig"> | string | null
+  llmModelSmall?: Prisma.StringNullableFilter<"AppConfig"> | string | null
+  embedModel?: Prisma.StringNullableFilter<"AppConfig"> | string | null
   updatedAt?: Prisma.DateTimeFilter<"AppConfig"> | Date | string
 }, "id">
 
@@ -344,6 +373,9 @@ export type AppConfigOrderByWithAggregationInput = {
   enableHandoff?: Prisma.SortOrderInput | Prisma.SortOrder
   handoffTeamId?: Prisma.SortOrderInput | Prisma.SortOrder
   handoffAssigneeId?: Prisma.SortOrderInput | Prisma.SortOrder
+  llmModel?: Prisma.SortOrderInput | Prisma.SortOrder
+  llmModelSmall?: Prisma.SortOrderInput | Prisma.SortOrder
+  embedModel?: Prisma.SortOrderInput | Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.AppConfigCountOrderByAggregateInput
   _max?: Prisma.AppConfigMaxOrderByAggregateInput
@@ -370,6 +402,9 @@ export type AppConfigScalarWhereWithAggregatesInput = {
   enableHandoff?: Prisma.BoolNullableWithAggregatesFilter<"AppConfig"> | boolean | null
   handoffTeamId?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
   handoffAssigneeId?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
+  llmModel?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
+  llmModelSmall?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
+  embedModel?: Prisma.StringNullableWithAggregatesFilter<"AppConfig"> | string | null
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"AppConfig"> | Date | string
 }
 
@@ -390,6 +425,9 @@ export type AppConfigCreateInput = {
   enableHandoff?: boolean | null
   handoffTeamId?: string | null
   handoffAssigneeId?: string | null
+  llmModel?: string | null
+  llmModelSmall?: string | null
+  embedModel?: string | null
   updatedAt?: Date | string
 }
 
@@ -410,6 +448,9 @@ export type AppConfigUncheckedCreateInput = {
   enableHandoff?: boolean | null
   handoffTeamId?: string | null
   handoffAssigneeId?: string | null
+  llmModel?: string | null
+  llmModelSmall?: string | null
+  embedModel?: string | null
   updatedAt?: Date | string
 }
 
@@ -430,6 +471,9 @@ export type AppConfigUpdateInput = {
   enableHandoff?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   handoffTeamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   handoffAssigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  llmModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  llmModelSmall?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  embedModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -450,6 +494,9 @@ export type AppConfigUncheckedUpdateInput = {
   enableHandoff?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   handoffTeamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   handoffAssigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  llmModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  llmModelSmall?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  embedModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -470,6 +517,9 @@ export type AppConfigCreateManyInput = {
   enableHandoff?: boolean | null
   handoffTeamId?: string | null
   handoffAssigneeId?: string | null
+  llmModel?: string | null
+  llmModelSmall?: string | null
+  embedModel?: string | null
   updatedAt?: Date | string
 }
 
@@ -490,6 +540,9 @@ export type AppConfigUpdateManyMutationInput = {
   enableHandoff?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   handoffTeamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   handoffAssigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  llmModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  llmModelSmall?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  embedModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -510,6 +563,9 @@ export type AppConfigUncheckedUpdateManyInput = {
   enableHandoff?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   handoffTeamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   handoffAssigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  llmModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  llmModelSmall?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  embedModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -530,6 +586,9 @@ export type AppConfigCountOrderByAggregateInput = {
   enableHandoff?: Prisma.SortOrder
   handoffTeamId?: Prisma.SortOrder
   handoffAssigneeId?: Prisma.SortOrder
+  llmModel?: Prisma.SortOrder
+  llmModelSmall?: Prisma.SortOrder
+  embedModel?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -550,6 +609,9 @@ export type AppConfigMaxOrderByAggregateInput = {
   enableHandoff?: Prisma.SortOrder
   handoffTeamId?: Prisma.SortOrder
   handoffAssigneeId?: Prisma.SortOrder
+  llmModel?: Prisma.SortOrder
+  llmModelSmall?: Prisma.SortOrder
+  embedModel?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -570,6 +632,9 @@ export type AppConfigMinOrderByAggregateInput = {
   enableHandoff?: Prisma.SortOrder
   handoffTeamId?: Prisma.SortOrder
   handoffAssigneeId?: Prisma.SortOrder
+  llmModel?: Prisma.SortOrder
+  llmModelSmall?: Prisma.SortOrder
+  embedModel?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -608,6 +673,9 @@ export type AppConfigSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   enableHandoff?: boolean
   handoffTeamId?: boolean
   handoffAssigneeId?: boolean
+  llmModel?: boolean
+  llmModelSmall?: boolean
+  embedModel?: boolean
   updatedAt?: boolean
 }, ExtArgs["result"]["appConfig"]>
 
@@ -628,6 +696,9 @@ export type AppConfigSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ext
   enableHandoff?: boolean
   handoffTeamId?: boolean
   handoffAssigneeId?: boolean
+  llmModel?: boolean
+  llmModelSmall?: boolean
+  embedModel?: boolean
   updatedAt?: boolean
 }, ExtArgs["result"]["appConfig"]>
 
@@ -648,6 +719,9 @@ export type AppConfigSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ext
   enableHandoff?: boolean
   handoffTeamId?: boolean
   handoffAssigneeId?: boolean
+  llmModel?: boolean
+  llmModelSmall?: boolean
+  embedModel?: boolean
   updatedAt?: boolean
 }, ExtArgs["result"]["appConfig"]>
 
@@ -668,10 +742,13 @@ export type AppConfigSelectScalar = {
   enableHandoff?: boolean
   handoffTeamId?: boolean
   handoffAssigneeId?: boolean
+  llmModel?: boolean
+  llmModelSmall?: boolean
+  embedModel?: boolean
   updatedAt?: boolean
 }
 
-export type AppConfigOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orgName" | "orgPhone" | "orgSchedule" | "orgAddress" | "orgWebsite" | "orgEOffice" | "preferredLang" | "responseStyle" | "customInstructions" | "greetingMessage" | "outOfScopeMessage" | "chatwootApiToken" | "enableHandoff" | "handoffTeamId" | "handoffAssigneeId" | "updatedAt", ExtArgs["result"]["appConfig"]>
+export type AppConfigOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orgName" | "orgPhone" | "orgSchedule" | "orgAddress" | "orgWebsite" | "orgEOffice" | "preferredLang" | "responseStyle" | "customInstructions" | "greetingMessage" | "outOfScopeMessage" | "chatwootApiToken" | "enableHandoff" | "handoffTeamId" | "handoffAssigneeId" | "llmModel" | "llmModelSmall" | "embedModel" | "updatedAt", ExtArgs["result"]["appConfig"]>
 
 export type $AppConfigPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "AppConfig"
@@ -693,6 +770,9 @@ export type $AppConfigPayload<ExtArgs extends runtime.Types.Extensions.InternalA
     enableHandoff: boolean | null
     handoffTeamId: string | null
     handoffAssigneeId: string | null
+    llmModel: string | null
+    llmModelSmall: string | null
+    embedModel: string | null
     updatedAt: Date
   }, ExtArgs["result"]["appConfig"]>
   composites: {}
@@ -1133,6 +1213,9 @@ export interface AppConfigFieldRefs {
   readonly enableHandoff: Prisma.FieldRef<"AppConfig", 'Boolean'>
   readonly handoffTeamId: Prisma.FieldRef<"AppConfig", 'String'>
   readonly handoffAssigneeId: Prisma.FieldRef<"AppConfig", 'String'>
+  readonly llmModel: Prisma.FieldRef<"AppConfig", 'String'>
+  readonly llmModelSmall: Prisma.FieldRef<"AppConfig", 'String'>
+  readonly embedModel: Prisma.FieldRef<"AppConfig", 'String'>
   readonly updatedAt: Prisma.FieldRef<"AppConfig", 'DateTime'>
 }
     
